@@ -204,7 +204,7 @@ def process_branch(gtrid, bqual, data):
 The `create_xa_chord` helper simplifies creating Celery chords with XA coordination:
 
 ```mermaid
-flowchart TD
+graph TD
     A[create_xa_chord] --> B[create_global]
     B --> C[create_branches]
     C --> D[Add xa_gtrid/xa_bqual to tasks]

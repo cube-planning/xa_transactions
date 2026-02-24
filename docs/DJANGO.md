@@ -110,13 +110,13 @@ The integration provides protection in both directions:
 When an XA transaction is active and code calls `transaction.atomic()`:
 
 ```mermaid
-flowchart TD
-    A[transaction.atomic called] --> B{XA transaction active?}
-    B -->|Yes| C[No-op: XA already active]
-    B -->|No| D[Normal Django transaction]
-    C --> E[Django ORM operations]
+graph TD
+    A["transaction.atomic called"] --> B{"XA transaction active?"}
+    B -->|Yes| C["No-op: XA already active"]
+    B -->|No| D["Normal Django transaction"]
+    C --> E["Django ORM operations"]
     D --> E
-    E --> F[Operations execute]
+    E --> F["Operations execute"]
 ```
 
 **Behavior:**
@@ -141,14 +141,14 @@ with adapter.branch_transaction(gtrid, bqual):
 When a Django transaction is active and code tries to start an XA transaction:
 
 ```mermaid
-flowchart TD
-    A[XA START called] --> B{Django transaction active?}
-    B -->|Yes| C{auto_commit_django?}
-    B -->|No| D[Proceed with XA START]
-    C -->|True| E[Commit Django transaction]
-    C -->|False| F[Raise XAAdapterError]
+graph TD
+    A["XA START called"] --> B{"Django transaction active?"}
+    B -->|Yes| C{"auto_commit_django?"}
+    B -->|No| D["Proceed with XA START"]
+    C -->|True| E["Commit Django transaction"]
+    C -->|False| F["Raise XAAdapterError"]
     E --> D
-    D --> G[XA transaction starts]
+    D --> G["XA transaction starts"]
 ```
 
 **Behavior:**
