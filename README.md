@@ -11,6 +11,28 @@ This library provides a complete solution for managing distributed MySQL transac
 - Strict atomic commit/rollback is required
 - A single-writer transaction is not feasible
 
+## How It Works
+
+The library coordinates a 2-phase commit protocol across parallel workers:
+
+```mermaid
+graph TD
+    A[Create Global Transaction] --> B[Create Branches]
+    B --> C[Parallel Branch Execution]
+    C --> D[Each Branch: XA START → Writes → XA END → XA PREPARE]
+    D --> E[All Branches Prepared?]
+    E -->|Yes| F[Finalize: COMMIT or ROLLBACK]
+    E -->|No| G[Wait/Recover]
+    G --> E
+    F --> H[Transaction Complete]
+```
+
+**Key Steps:**
+1. **Create**: Coordinator creates a global transaction and branch records
+2. **Execute**: Parallel workers each run `XA START`, perform writes, then `XA PREPARE`
+3. **Finalize**: Once all branches are prepared, coordinator commits or rolls back atomically
+4. **Recovery**: Automatic garbage collection recovers in-doubt transactions
+
 ## Features
 
 - **XA Protocol Support**: Full implementation of MySQL XA commands (START, END, PREPARE, COMMIT, ROLLBACK, RECOVER)

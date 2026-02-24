@@ -14,7 +14,33 @@ The library is organized into logical submodules:
 - **`types/`**: Type definitions, protocols, and exceptions
 - **`infrastructure/`**: Supporting infrastructure (connections, recovery)
 - **`observability/`**: Monitoring and hooks (hooks, metrics)
-- **`integrations/`**: External integrations (Celery)
+- **`integrations/`**: External integrations (Celery, Django)
+
+```mermaid
+graph TD
+    A[xa_transactions] --> B[core/]
+    A --> C[types/]
+    A --> D[infrastructure/]
+    A --> E[observability/]
+    A --> F[integrations/]
+    
+    B --> B1[adapter.py]
+    B --> B2[coordinator.py]
+    B --> B3[store.py]
+    
+    C --> C1[types.py]
+    C --> C2[protocols.py]
+    C --> C3[exceptions.py]
+    
+    D --> D1[connections.py]
+    D --> D2[recovery.py]
+    
+    E --> E1[hooks.py]
+    E --> E2[metrics.py]
+    
+    F --> F1[celery.py]
+    F --> F2[django.py]
+```
 
 All public APIs are exported from the main `xa_transactions` package, so users can import directly:
 ```python
@@ -22,6 +48,49 @@ from xa_transactions import Coordinator, MySQLXAAdapter, MySQLStore
 ```
 
 ## Core Components
+
+The library's architecture centers around three core components that work together to coordinate distributed transactions:
+
+```mermaid
+graph TB
+    subgraph "Application Layer"
+        App[Application Code]
+        Celery[Celery Tasks]
+        Django[Django ORM]
+    end
+    
+    subgraph "XA Transactions Library"
+        Coord[Coordinator<br/>Orchestrates 2PC]
+        Adapter[XA Adapter<br/>MySQL XA Commands]
+        Store[Coordinator Store<br/>Durable State]
+        
+        Coord --> Adapter
+        Coord --> Store
+        Coord -.-> Hooks[Transaction Hooks]
+        Coord -.-> Metrics[Metrics Collector]
+        Coord -.-> Recovery[Recovery Strategy]
+        Coord -.-> Lock[Lock Manager]
+    end
+    
+    subgraph "Database"
+        MySQL[(MySQL Database<br/>XA Transactions)]
+    end
+    
+    App --> Coord
+    Celery -.-> Coord
+    Django -.-> Adapter
+    Adapter --> MySQL
+    Store --> MySQL
+    
+    style Coord fill:#e1f5ff
+    style Adapter fill:#fff4e1
+    style Store fill:#e8f5e9
+```
+
+**Component Responsibilities:**
+- **Coordinator**: Orchestrates the 2-phase commit protocol, manages state, handles recovery
+- **XA Adapter**: Executes MySQL XA commands (START, END, PREPARE, COMMIT, ROLLBACK, RECOVER)
+- **Coordinator Store**: Maintains durable state for global transactions and branches
 
 ### 1. XA Adapter (`xa_transactions.core.adapter`)
 
@@ -99,12 +168,38 @@ Global States:
 - `ROLLING_BACK`: Rolling back branches
 - `ROLLED_BACK`: All branches rolled back
 
+```mermaid
+stateDiagram-v2
+    [*] --> ACTIVE: create_global()
+    ACTIVE --> PREPARING: Branches start preparing
+    PREPARING --> PREPARED: All branches prepared
+    PREPARING --> ROLLING_BACK: Decision = ROLLBACK
+    PREPARED --> COMMITTING: finalize(COMMIT)
+    PREPARED --> ROLLING_BACK: finalize(ROLLBACK)
+    COMMITTING --> COMMITTED: All branches committed
+    ROLLING_BACK --> ROLLED_BACK: All branches rolled back
+    COMMITTED --> [*]
+    ROLLED_BACK --> [*]
+```
+
 Branch States:
 - `EXPECTED`: Branch record created, not yet started
 - `ACTIVE`: XA START issued, executing
 - `PREPARED`: XA PREPARE succeeded
 - `COMMITTED`: XA COMMIT succeeded
 - `ROLLED_BACK`: XA ROLLBACK succeeded
+
+```mermaid
+stateDiagram-v2
+    [*] --> EXPECTED: create_branches()
+    EXPECTED --> ACTIVE: XA START
+    ACTIVE --> PREPARED: XA PREPARE succeeds
+    ACTIVE --> ROLLED_BACK: XA ROLLBACK (error)
+    PREPARED --> COMMITTED: XA COMMIT
+    PREPARED --> ROLLED_BACK: XA ROLLBACK
+    COMMITTED --> [*]
+    ROLLED_BACK --> [*]
+```
 
 **Design Decisions:**
 - Idempotent finalization operations
@@ -203,6 +298,61 @@ The library uses Python Protocols to enable pluggable implementations:
 - **`MetricsCollector`**: Custom metrics collection
 - **`RecoveryStrategy`**: Custom recovery logic
 - **`LockManager`**: Distributed locking for multi-coordinator scenarios
+
+```mermaid
+graph LR
+    subgraph "Protocol Interfaces"
+        SP[StoreProtocol]
+        XAP[XAAdapterProtocol]
+        TH[TransactionHooks]
+        MC[MetricsCollector]
+        RS[RecoveryStrategy]
+        LM[LockManager]
+    end
+    
+    subgraph "Built-in Implementations"
+        MS[MySQLStore]
+        MA[MySQLXAAdapter]
+        NH[NoOpHooks]
+        LH[LoggingHooks]
+        NM[NoOpMetrics]
+        LM2[LoggingMetrics]
+        DRS[DefaultRecoveryStrategy]
+    end
+    
+    subgraph "Custom Implementations"
+        DS[DjangoStore]
+        SA[SQLAlchemyStore]
+        RS2[RedisStore]
+        CH[CustomHooks]
+        PM[PrometheusMetrics]
+        CRS[CustomRecoveryStrategy]
+        RLM[RedisLockManager]
+    end
+    
+    MS -.->|implements| SP
+    DS -.->|implements| SP
+    SA -.->|implements| SP
+    RS2 -.->|implements| SP
+    
+    MA -.->|implements| XAP
+    
+    NH -.->|implements| TH
+    LH -.->|implements| TH
+    CH -.->|implements| TH
+    
+    NM -.->|implements| MC
+    LM2 -.->|implements| MC
+    PM -.->|implements| MC
+    
+    DRS -.->|implements| RS
+    CRS -.->|implements| RS
+    
+    RLM -.->|implements| LM
+    
+    classDef protocol fill:#e1f5ff
+    class SP,XAP,TH,MC,RS,LM protocol
+```
 
 See `examples/custom_store_example.py` for an example of implementing a custom store.
 
