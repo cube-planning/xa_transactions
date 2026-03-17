@@ -14,13 +14,15 @@ class MySQLXAAdapter:
     Works with mysql.connector, PyMySQL, mysqlclient, etc.
     """
 
-    def __init__(self, connection: Connection):
+    def __init__(self, connection: Connection, format_id: int = 1):
         """Initialize MySQL XA adapter.
 
         Args:
             connection: MySQL connection object (mysql.connector, PyMySQL, etc.)
+            format_id: XA format ID to use when constructing XIDs
         """
         self.connection = connection
+        self.format_id = format_id
 
     def _execute(self, sql: str, params: Optional[Tuple[Any, ...]] = None) -> Any:
         """Execute SQL statement.
@@ -232,7 +234,7 @@ class MySQLXAAdapter:
             with adapter.branch_transaction(gtrid, bqual):
                 adapter.execute("INSERT INTO ...")
         """
-        xid = XID(gtrid=gtrid, bqual=bqual)
+        xid = XID(gtrid=gtrid, bqual=bqual, format_id=self.format_id)
         
         # Set XA state for Django integration
         try:
