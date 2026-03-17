@@ -1,6 +1,8 @@
 """Default implementations for metrics collection."""
 
-from typing import Optional, Any
+from __future__ import annotations
+
+from typing import Any
 from xa_transactions.types.protocols import MetricsCollector
 from xa_transactions.types.types import Decision
 
@@ -41,7 +43,7 @@ class NoOpMetrics:
     def record_error(
         self,
         error_type: str,
-        gtrid: Optional[str] = None,
+        gtrid: str | None = None,
     ) -> None:
         pass
 
@@ -52,7 +54,7 @@ class LoggingMetrics:
     Uses Python's logging module to log metrics events.
     """
 
-    def __init__(self, logger: Optional[Any] = None):
+    def __init__(self, logger: Any | None = None):
         """Initialize logging metrics.
 
         Args:
@@ -98,6 +100,6 @@ class LoggingMetrics:
     def record_error(
         self,
         error_type: str,
-        gtrid: Optional[str] = None,
+        gtrid: str | None = None,
     ) -> None:
         self.logger.warning(f"Metric: error, type={error_type}, gtrid={gtrid}")

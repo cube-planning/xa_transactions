@@ -1,6 +1,7 @@
 """Recovery strategy implementations."""
 
-from typing import List, Optional
+from __future__ import annotations
+
 from contextlib import nullcontext
 from datetime import datetime, timezone
 from xa_transactions.types.protocols import (
@@ -31,13 +32,13 @@ class DefaultRecoveryStrategy:
 
     def recover(
         self,
-        incomplete_globals: List[GlobalTransaction],
-        recovered_xids: List[XID],
+        incomplete_globals: list[GlobalTransaction],
+        recovered_xids: list[XID],
         adapter: XAAdapterProtocol,
         store: StoreProtocol,
         max_age_seconds: int,
         auto_rollback_expired: bool,
-        lock_manager: Optional[LockManager] = None,
+        lock_manager: LockManager | None = None,
         format_id: int = 1,
     ) -> int:
         """Recover in-doubt transactions.
@@ -156,7 +157,7 @@ class DefaultRecoveryStrategy:
     def _commit_global(
         self,
         gtrid: str,
-        branches: List[BranchTransaction],
+        branches: list[BranchTransaction],
         adapter: XAAdapterProtocol,
         store: StoreProtocol,
         format_id: int = 1,
@@ -191,7 +192,7 @@ class DefaultRecoveryStrategy:
     def _rollback_global(
         self,
         gtrid: str,
-        branches: List[BranchTransaction],
+        branches: list[BranchTransaction],
         adapter: XAAdapterProtocol,
         store: StoreProtocol,
         format_id: int = 1,

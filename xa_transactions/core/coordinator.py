@@ -1,9 +1,11 @@
 """Coordinator for XA transaction management."""
 
+from __future__ import annotations
+
 import uuid
 import time
+from collections.abc import Callable
 from contextlib import nullcontext
-from typing import List, Optional, Callable
 from datetime import datetime, timezone
 from xa_transactions.core.adapter import MySQLXAAdapter
 from xa_transactions.types.protocols import (
@@ -38,12 +40,12 @@ from xa_transactions.types.types import (
 def create_coordinator(
     adapter: XAAdapterProtocol,
     store_connection: Connection,
-    branch_id_generator: Optional[Callable[[int], str]] = None,
-    hooks: Optional[TransactionHooks] = None,
-    metrics: Optional[MetricsCollector] = None,
-    lock_manager: Optional[LockManager] = None,
+    branch_id_generator: Callable[[int], str] | None = None,
+    hooks: TransactionHooks | None = None,
+    metrics: MetricsCollector | None = None,
+    lock_manager: LockManager | None = None,
     format_id: int = 1,
-) -> "Coordinator":
+) -> Coordinator:
     """Convenience function to create a Coordinator with MySQLStore.
 
     This maintains backward compatibility with the old API where a connection
@@ -83,11 +85,11 @@ class Coordinator:
         self,
         adapter: XAAdapterProtocol,
         store: StoreProtocol,
-        branch_id_generator: Optional[Callable[[int], str]] = None,
-        hooks: Optional[TransactionHooks] = None,
-        metrics: Optional[MetricsCollector] = None,
-        recovery_strategy: Optional[RecoveryStrategy] = None,
-        lock_manager: Optional[LockManager] = None,
+        branch_id_generator: Callable[[int], str] | None = None,
+        hooks: TransactionHooks | None = None,
+        metrics: MetricsCollector | None = None,
+        recovery_strategy: RecoveryStrategy | None = None,
+        lock_manager: LockManager | None = None,
         format_id: int = 1,
     ):
         """Initialize coordinator.
@@ -118,7 +120,7 @@ class Coordinator:
             lambda idx: f"branch_{idx:04d}_{uuid.uuid4().hex[:8]}"
         )
 
-    def create_global(self, expected_branches: int, gtrid: Optional[str] = None) -> str:
+    def create_global(self, expected_branches: int, gtrid: str | None = None) -> str:
         """Create a new global transaction.
 
         Args:
@@ -144,9 +146,9 @@ class Coordinator:
     def create_branches(
         self,
         gtrid: str,
-        count: Optional[int] = None,
-        bquals: Optional[List[str]] = None,
-    ) -> List[str]:
+        count: int | None = None,
+        bquals: list[str] | None = None,
+    ) -> list[str]:
         """Create branch transaction records.
 
         Args:
@@ -277,7 +279,7 @@ class Coordinator:
     def _commit_global(
         self,
         gtrid: str,
-        branches: List[BranchTransaction],
+        branches: list[BranchTransaction],
     ) -> None:
         """Commit a global transaction.
 
@@ -314,7 +316,7 @@ class Coordinator:
     def _rollback_global(
         self,
         gtrid: str,
-        branches: List[BranchTransaction],
+        branches: list[BranchTransaction],
     ) -> None:
         """Rollback a global transaction.
 
@@ -397,8 +399,8 @@ class Coordinator:
         self,
         gtrid: str,
         bqual: str,
-        format_id: Optional[int] = None,
-    ) -> Optional[BranchState]:
+        format_id: int | None = None,
+    ) -> BranchState | None:
         """Reconcile branch state by checking XA RECOVER.
 
         Useful for determining if a branch was prepared after connection loss.

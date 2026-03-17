@@ -1,6 +1,7 @@
 """MySQL-based coordinator store implementation."""
 
-from typing import List, Optional
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from xa_transactions.types.types import (
     Decision,
@@ -111,7 +112,7 @@ class MySQLStore:
         finally:
             cursor.close()
 
-    def get_global(self, gtrid: str) -> Optional[GlobalTransaction]:
+    def get_global(self, gtrid: str) -> GlobalTransaction | None:
         """Get global transaction by gtrid.
 
         Args:
@@ -146,9 +147,9 @@ class MySQLStore:
     def update_global(
         self,
         gtrid: str,
-        decision: Optional[Decision] = None,
-        state: Optional[GlobalState] = None,
-        finalized_at: Optional[datetime] = None,
+        decision: Decision | None = None,
+        state: GlobalState | None = None,
+        finalized_at: datetime | None = None,
     ) -> None:
         """Update global transaction.
 
@@ -191,7 +192,7 @@ class MySQLStore:
         gtrid: str,
         bqual: str,
         state: BranchState = BranchState.EXPECTED,
-        prepared_at: Optional[datetime] = None,
+        prepared_at: datetime | None = None,
     ) -> BranchTransaction:
         """Create a branch transaction record.
 
@@ -237,7 +238,7 @@ class MySQLStore:
         finally:
             cursor.close()
 
-    def get_branch(self, gtrid: str, bqual: str) -> Optional[BranchTransaction]:
+    def get_branch(self, gtrid: str, bqual: str) -> BranchTransaction | None:
         """Get branch transaction.
 
         Args:
@@ -272,8 +273,8 @@ class MySQLStore:
         self,
         gtrid: str,
         bqual: str,
-        state: Optional[BranchState] = None,
-        prepared_at: Optional[datetime] = None,
+        state: BranchState | None = None,
+        prepared_at: datetime | None = None,
     ) -> None:
         """Update branch transaction.
 
@@ -308,7 +309,7 @@ class MySQLStore:
         finally:
             cursor.close()
 
-    def get_branches(self, gtrid: str) -> List[BranchTransaction]:
+    def get_branches(self, gtrid: str) -> list[BranchTransaction]:
         """Get all branches for a global transaction.
 
         Args:
@@ -340,7 +341,7 @@ class MySQLStore:
         finally:
             cursor.close()
 
-    def get_prepared_branches(self, gtrid: str) -> List[BranchTransaction]:
+    def get_prepared_branches(self, gtrid: str) -> list[BranchTransaction]:
         """Get all prepared branches for a global transaction.
 
         Args:
@@ -374,8 +375,8 @@ class MySQLStore:
 
     def get_incomplete_globals(
         self,
-        max_age_seconds: Optional[int] = None,
-    ) -> List[GlobalTransaction]:
+        max_age_seconds: int | None = None,
+    ) -> list[GlobalTransaction]:
         """Get incomplete global transactions.
 
         Args:

@@ -1,7 +1,8 @@
 """Example of using a custom store implementation with the Coordinator."""
 
+from __future__ import annotations
+
 import mysql.connector
-from typing import List, Optional
 from datetime import datetime, timezone
 from xa_transactions import (
     XAAdapter,
@@ -76,16 +77,16 @@ class CustomStore:
         self._globals[gtrid] = global_tx
         return global_tx
 
-    def get_global(self, gtrid: str) -> Optional[GlobalTransaction]:
+    def get_global(self, gtrid: str) -> GlobalTransaction | None:
         """Get global transaction by gtrid."""
         return self._globals.get(gtrid)
 
     def update_global(
         self,
         gtrid: str,
-        decision: Optional[Decision] = None,
-        state: Optional[GlobalState] = None,
-        finalized_at: Optional[datetime] = None,
+        decision: Decision | None = None,
+        state: GlobalState | None = None,
+        finalized_at: datetime | None = None,
     ) -> None:
         """Update global transaction."""
         if gtrid not in self._globals:
@@ -104,7 +105,7 @@ class CustomStore:
         gtrid: str,
         bqual: str,
         state: BranchState = BranchState.EXPECTED,
-        prepared_at: Optional[datetime] = None,
+        prepared_at: datetime | None = None,
     ) -> BranchTransaction:
         """Create a branch transaction record."""
         now = datetime.now(timezone.utc)
@@ -123,7 +124,7 @@ class CustomStore:
         self,
         gtrid: str,
         bqual: str,
-    ) -> Optional[BranchTransaction]:
+    ) -> BranchTransaction | None:
         """Get branch transaction."""
         return self._branches.get((gtrid, bqual))
 
@@ -131,8 +132,8 @@ class CustomStore:
         self,
         gtrid: str,
         bqual: str,
-        state: Optional[BranchState] = None,
-        prepared_at: Optional[datetime] = None,
+        state: BranchState | None = None,
+        prepared_at: datetime | None = None,
     ) -> None:
         """Update branch transaction."""
         key = (gtrid, bqual)
@@ -145,14 +146,14 @@ class CustomStore:
             branch.prepared_at = prepared_at
         branch.updated_at = datetime.now(timezone.utc)
 
-    def get_branches(self, gtrid: str) -> List[BranchTransaction]:
+    def get_branches(self, gtrid: str) -> list[BranchTransaction]:
         """Get all branches for a global transaction."""
         return [
             branch for (g, b), branch in self._branches.items()
             if g == gtrid
         ]
 
-    def get_prepared_branches(self, gtrid: str) -> List[BranchTransaction]:
+    def get_prepared_branches(self, gtrid: str) -> list[BranchTransaction]:
         """Get all prepared branches."""
         return [
             branch for branch in self.get_branches(gtrid)
@@ -161,8 +162,8 @@ class CustomStore:
 
     def get_incomplete_globals(
         self,
-        max_age_seconds: Optional[int] = None,
-    ) -> List[GlobalTransaction]:
+        max_age_seconds: int | None = None,
+    ) -> list[GlobalTransaction]:
         """Get incomplete global transactions."""
         incomplete = [
             g for g in self._globals.values()

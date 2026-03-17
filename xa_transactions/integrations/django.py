@@ -3,10 +3,11 @@
 Provides seamless integration between Django's transaction.atomic() and XA transactions.
 """
 
+from __future__ import annotations
+
 import os
 import threading
 from contextlib import contextmanager
-from typing import Optional
 
 # Thread-local storage for XA transaction state
 _xa_state = threading.local()
@@ -34,7 +35,7 @@ def is_xa_active() -> bool:
     return getattr(_xa_state, 'active', False)
 
 
-def is_django_transaction_active(using: Optional[str] = None) -> bool:
+def is_django_transaction_active(using: str | None = None) -> bool:
     """Check if a Django transaction is currently active.
     
     Args:

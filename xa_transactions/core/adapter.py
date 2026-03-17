@@ -1,6 +1,8 @@
 """MySQL XA adapter implementation."""
 
-from typing import Any, Optional, List, Tuple
+from __future__ import annotations
+
+from typing import Any
 from contextlib import contextmanager
 from xa_transactions.types.types import XID
 from xa_transactions.types.protocols import Connection, XAAdapterProtocol
@@ -24,7 +26,7 @@ class MySQLXAAdapter:
         self.connection = connection
         self.format_id = format_id
 
-    def _execute(self, sql: str, params: Optional[Tuple[Any, ...]] = None) -> Any:
+    def _execute(self, sql: str, params: tuple[Any, ...] | None = None) -> Any:
         """Execute SQL statement.
 
         Args:
@@ -164,7 +166,7 @@ class MySQLXAAdapter:
         except Exception as e:
             raise XAAdapterError(f"XA ROLLBACK failed: {e}") from e
 
-    def xa_recover(self) -> List[XID]:
+    def xa_recover(self) -> list[XID]:
         """Recover prepared XA transactions.
 
         Returns:
@@ -202,7 +204,7 @@ class MySQLXAAdapter:
         except Exception as e:
             raise XAAdapterError(f"XA RECOVER failed: {e}") from e
 
-    def execute(self, sql: str, params: Optional[Tuple[Any, ...]] = None) -> Any:
+    def execute(self, sql: str, params: tuple[Any, ...] | None = None) -> Any:
         """Execute a regular SQL statement within the current XA transaction.
 
         Args:
