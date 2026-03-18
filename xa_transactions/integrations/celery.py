@@ -104,6 +104,10 @@ class XATask(Task):
             return result
         except Exception:
             try:
+                adapter.xa_end(xid)
+            except Exception:
+                pass
+            try:
                 adapter.xa_rollback(xid)
             except Exception:
                 pass
@@ -169,6 +173,10 @@ def xa_task(
                 adapter.xa_prepare(xid)
                 return result
             except Exception:
+                try:
+                    adapter.xa_end(xid)
+                except Exception:
+                    pass
                 try:
                     adapter.xa_rollback(xid)
                 except Exception:

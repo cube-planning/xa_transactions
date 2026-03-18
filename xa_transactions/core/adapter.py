@@ -252,6 +252,10 @@ class MySQLXAAdapter:
             self.xa_prepare(xid)
         except Exception:
             try:
+                self.xa_end(xid)
+            except XAAdapterError:
+                pass
+            try:
                 self.xa_rollback(xid)
             except XAAdapterError:
                 pass
