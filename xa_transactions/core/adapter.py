@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from typing import Any
 from contextlib import contextmanager
 from xa_transactions.types.types import XID
@@ -217,7 +218,7 @@ class MySQLXAAdapter:
         return self._execute(sql, params)
 
     @contextmanager
-    def branch_transaction(self, gtrid: str, bqual: str, auto_commit_django: bool = False):
+    def branch_transaction(self, gtrid: str, bqual: str, auto_commit_django: bool = False) -> Generator[MySQLXAAdapter, None, None]:
         """Context manager for a branch transaction.
 
         Automatically handles XA START, END, and PREPARE.
