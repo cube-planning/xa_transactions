@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import os
 import threading
-from contextlib import contextmanager
+from contextlib import ContextDecorator
+from typing import Any, Callable
 
 # Thread-local storage for XA transaction state
 _xa_state = threading.local()
@@ -59,34 +60,74 @@ def is_django_transaction_active(using: str | None = None) -> bool:
         return False
 
 
-@contextmanager
-def xa_aware_atomic(using=None, savepoint=True, durable=False):
-    """Django transaction.atomic() wrapper that detects XA transactions.
-    
-    If an XA transaction is active, this becomes a no-op (or uses savepoints
-    if MySQL allows it).
-    
-    Args:
-        using: Database alias (Django parameter)
-        savepoint: Whether to use savepoints (Django parameter)
-        durable: Whether transaction is durable (Django parameter)
-    
-    Yields:
-        None
+class _XAAwareAtomic(ContextDecorator):
+    """Drop-in replacement for Django's Atomic that no-ops when XA is active.
+
+    Extends ContextDecorator so it works as both a context manager and a
+    decorator, matching the behaviour of Django's Atomic.
     """
+
+    def __init__(
+        self,
+        using: str | None,
+        savepoint: bool,
+        durable: bool,
+        original_atomic: Callable[..., Any],
+    ) -> None:
+        self.using = using
+        self.savepoint = savepoint
+        self.durable = durable
+        self._original_atomic = original_atomic
+        self._delegate: Any | None = None
+
+    def _recreate_cm(self) -> _XAAwareAtomic:
+        return self.__class__(
+            self.using, self.savepoint, self.durable, self._original_atomic,
+        )
+
+    def __enter__(self) -> None:
+        if is_xa_active():
+            self._delegate = None
+            return None
+        self._delegate = self._original_atomic(
+            using=self.using, savepoint=self.savepoint, durable=self.durable,
+        )
+        self._delegate.__enter__()
+        return None
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: Any | None,
+    ) -> bool | None:
+        if self._delegate is not None:
+            return self._delegate.__exit__(exc_type, exc_value, traceback)
+        return None
+
+
+def _get_original_atomic() -> Callable[..., Any]:
+    if _ORIGINAL_ATOMIC is not None:
+        return _ORIGINAL_ATOMIC
     try:
         from django.db import transaction as django_transaction
     except ImportError:
         raise ImportError("Django is not installed")
-    
-    if is_xa_active():
-        # XA transaction is active - just yield (no-op)
-        # Django ORM operations will work within the XA transaction
-        yield
-    else:
-        # Normal Django transaction
-        with django_transaction.atomic(using=using, savepoint=savepoint, durable=durable):
-            yield
+    return django_transaction.atomic
+
+
+def xa_aware_atomic(using: str | Callable[..., Any] | None = None, savepoint: bool = True, durable: bool = False) -> _XAAwareAtomic | Callable[..., Any]:
+    """Django transaction.atomic() replacement that no-ops when XA is active.
+
+    Supports all three usage patterns that Django's atomic supports:
+        - ``with xa_aware_atomic():``
+        - ``@xa_aware_atomic``
+        - ``@xa_aware_atomic(using='other')``
+    """
+    original = _get_original_atomic()
+    if callable(using):
+        return _XAAwareAtomic(None, savepoint, durable, original)(using)
+    return _XAAwareAtomic(using, savepoint, durable, original)
 
 
 def enable_xa_aware_transactions() -> None:
@@ -114,18 +155,16 @@ def enable_xa_aware_transactions() -> None:
     
     # Store original
     _ORIGINAL_ATOMIC = django_transaction.atomic
-    
-    # Create wrapper
-    @contextmanager
-    def _xa_aware_atomic_wrapper(using=None, savepoint=True, durable=False):
-        if is_xa_active():
-            # XA transaction is active - no-op
-            yield
-        else:
-            # Normal behavior
-            with _ORIGINAL_ATOMIC(using=using, savepoint=savepoint, durable=durable):
-                yield
-    
+
+    def _xa_aware_atomic_wrapper(
+        using: str | Callable[..., Any] | None = None,
+        savepoint: bool = True,
+        durable: bool = False,
+    ) -> _XAAwareAtomic | Callable[..., Any]:
+        if callable(using):
+            return _XAAwareAtomic(None, savepoint, durable, _ORIGINAL_ATOMIC)(using)
+        return _XAAwareAtomic(using, savepoint, durable, _ORIGINAL_ATOMIC)
+
     # Monkey-patch
     django_transaction.atomic = _xa_aware_atomic_wrapper
     _XA_AWARE_ENABLED = True
