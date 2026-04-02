@@ -149,6 +149,8 @@ class DefaultRecoveryStrategy:
                 except Exception as e:
                     raise RecoveryError(f"Recovery failed for gtrid {global_tx.gtrid}: {e}") from e
 
+        return recovered
+
     def _commit_global(
         self,
         gtrid: str,
