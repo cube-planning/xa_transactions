@@ -1,6 +1,7 @@
 """Recovery strategy implementations."""
 
-from typing import List, Optional
+from __future__ import annotations
+
 from contextlib import nullcontext
 from datetime import datetime, timezone
 from xa_transactions.types.protocols import (
@@ -31,13 +32,14 @@ class DefaultRecoveryStrategy:
 
     def recover(
         self,
-        incomplete_globals: List[GlobalTransaction],
-        recovered_xids: List[XID],
+        incomplete_globals: list[GlobalTransaction],
+        recovered_xids: list[XID],
         adapter: XAAdapterProtocol,
         store: StoreProtocol,
         max_age_seconds: int,
         auto_rollback_expired: bool,
-        lock_manager: Optional[LockManager] = None,
+        lock_manager: LockManager | None = None,
+        format_id: int = 1,
     ) -> int:
         """Recover in-doubt transactions.
 
@@ -49,6 +51,7 @@ class DefaultRecoveryStrategy:
             max_age_seconds: Maximum age for expired transactions
             auto_rollback_expired: If True, auto-rollback expired UNKNOWN transactions
             lock_manager: Optional lock manager for per-transaction locking
+            format_id: XA format ID for XID construction during recovery
 
         Returns:
             Number of transactions recovered
@@ -120,13 +123,13 @@ class DefaultRecoveryStrategy:
                     if global_tx.decision == Decision.COMMIT:
                         if prepared_branches:
                             self._commit_global(
-                                global_tx.gtrid, prepared_branches, adapter, store
+                                global_tx.gtrid, prepared_branches, adapter, store, format_id
                             )
                             recovered += 1
                     elif global_tx.decision == Decision.ROLLBACK:
                         if prepared_branches:
                             self._rollback_global(
-                                global_tx.gtrid, prepared_branches, adapter, store
+                                global_tx.gtrid, prepared_branches, adapter, store, format_id
                             )
                             recovered += 1
                     elif global_tx.decision == Decision.UNKNOWN:
@@ -143,6 +146,7 @@ class DefaultRecoveryStrategy:
                                         prepared_branches,
                                         adapter,
                                         store,
+                                        format_id,
                                     )
                                     recovered += 1
                 except Exception as e:
@@ -153,9 +157,10 @@ class DefaultRecoveryStrategy:
     def _commit_global(
         self,
         gtrid: str,
-        branches: List[BranchTransaction],
+        branches: list[BranchTransaction],
         adapter: XAAdapterProtocol,
         store: StoreProtocol,
+        format_id: int = 1,
     ) -> None:
         """Commit a global transaction."""
         store.update_global(
@@ -166,7 +171,7 @@ class DefaultRecoveryStrategy:
 
         for branch in branches:
             try:
-                xid = XID(gtrid=gtrid, bqual=branch.bqual)
+                xid = XID(gtrid=gtrid, bqual=branch.bqual, format_id=format_id)
                 adapter.xa_commit(xid)
                 store.update_branch(
                     gtrid=gtrid,
@@ -187,9 +192,10 @@ class DefaultRecoveryStrategy:
     def _rollback_global(
         self,
         gtrid: str,
-        branches: List[BranchTransaction],
+        branches: list[BranchTransaction],
         adapter: XAAdapterProtocol,
         store: StoreProtocol,
+        format_id: int = 1,
     ) -> None:
         """Rollback a global transaction."""
         store.update_global(
@@ -200,7 +206,7 @@ class DefaultRecoveryStrategy:
 
         for branch in branches:
             try:
-                xid = XID(gtrid=gtrid, bqual=branch.bqual)
+                xid = XID(gtrid=gtrid, bqual=branch.bqual, format_id=format_id)
                 adapter.xa_rollback(xid)
                 store.update_branch(
                     gtrid=gtrid,

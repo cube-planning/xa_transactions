@@ -1,9 +1,11 @@
 """Coordinator for XA transaction management."""
 
+from __future__ import annotations
+
 import uuid
 import time
+from collections.abc import Callable
 from contextlib import nullcontext
-from typing import List, Optional, Callable
 from datetime import datetime, timezone
 from xa_transactions.core.adapter import MySQLXAAdapter
 from xa_transactions.types.protocols import (
@@ -38,11 +40,12 @@ from xa_transactions.types.types import (
 def create_coordinator(
     adapter: XAAdapterProtocol,
     store_connection: Connection,
-    branch_id_generator: Optional[Callable[[int], str]] = None,
-    hooks: Optional[TransactionHooks] = None,
-    metrics: Optional[MetricsCollector] = None,
-    lock_manager: Optional[LockManager] = None,
-) -> "Coordinator":
+    branch_id_generator: Callable[[int], str] | None = None,
+    hooks: TransactionHooks | None = None,
+    metrics: MetricsCollector | None = None,
+    lock_manager: LockManager | None = None,
+    format_id: int = 1,
+) -> Coordinator:
     """Convenience function to create a Coordinator with MySQLStore.
 
     This maintains backward compatibility with the old API where a connection
@@ -55,6 +58,7 @@ def create_coordinator(
         hooks: Optional transaction lifecycle hooks
         metrics: Optional metrics collector
         lock_manager: Optional distributed lock manager
+        format_id: XA format ID to distinguish this transaction manager's XIDs
 
     Returns:
         Coordinator instance with MySQLStore
@@ -70,6 +74,7 @@ def create_coordinator(
         hooks=hooks,
         metrics=metrics,
         lock_manager=lock_manager,
+        format_id=format_id,
     )
 
 
@@ -80,11 +85,12 @@ class Coordinator:
         self,
         adapter: XAAdapterProtocol,
         store: StoreProtocol,
-        branch_id_generator: Optional[Callable[[int], str]] = None,
-        hooks: Optional[TransactionHooks] = None,
-        metrics: Optional[MetricsCollector] = None,
-        recovery_strategy: Optional[RecoveryStrategy] = None,
-        lock_manager: Optional[LockManager] = None,
+        branch_id_generator: Callable[[int], str] | None = None,
+        hooks: TransactionHooks | None = None,
+        metrics: MetricsCollector | None = None,
+        recovery_strategy: RecoveryStrategy | None = None,
+        lock_manager: LockManager | None = None,
+        format_id: int = 1,
     ):
         """Initialize coordinator.
 
@@ -99,6 +105,9 @@ class Coordinator:
             lock_manager: Optional distributed lock manager for multi-coordinator coordination.
                 MUST be a distributed lock (Redis, etcd, etc.) - not a local/process lock.
                 If None, assumes single-coordinator scenario (no locking).
+            format_id: XA format ID to distinguish this transaction manager's XIDs.
+                Per the XA spec, different transaction managers sharing a database
+                should use different format_id values.
         """
         self.adapter = adapter
         self.store = store
@@ -106,11 +115,12 @@ class Coordinator:
         self.metrics = metrics or NoOpMetrics()
         self.recovery_strategy = recovery_strategy or DefaultRecoveryStrategy()
         self.lock_manager = lock_manager
+        self.format_id = format_id
         self._branch_id_generator = branch_id_generator or (
             lambda idx: f"branch_{idx:04d}_{uuid.uuid4().hex[:8]}"
         )
 
-    def create_global(self, expected_branches: int, gtrid: Optional[str] = None) -> str:
+    def create_global(self, expected_branches: int, gtrid: str | None = None) -> str:
         """Create a new global transaction.
 
         Args:
@@ -136,9 +146,9 @@ class Coordinator:
     def create_branches(
         self,
         gtrid: str,
-        count: Optional[int] = None,
-        bquals: Optional[List[str]] = None,
-    ) -> List[str]:
+        count: int | None = None,
+        bquals: list[str] | None = None,
+    ) -> list[str]:
         """Create branch transaction records.
 
         Args:
@@ -269,7 +279,7 @@ class Coordinator:
     def _commit_global(
         self,
         gtrid: str,
-        branches: List[BranchTransaction],
+        branches: list[BranchTransaction],
     ) -> None:
         """Commit a global transaction.
 
@@ -285,7 +295,7 @@ class Coordinator:
 
         for branch in branches:
             try:
-                xid = XID(gtrid=gtrid, bqual=branch.bqual)
+                xid = XID(gtrid=gtrid, bqual=branch.bqual, format_id=self.format_id)
                 self.adapter.xa_commit(xid)
                 self.store.update_branch(
                     gtrid=gtrid,
@@ -306,7 +316,7 @@ class Coordinator:
     def _rollback_global(
         self,
         gtrid: str,
-        branches: List[BranchTransaction],
+        branches: list[BranchTransaction],
     ) -> None:
         """Rollback a global transaction.
 
@@ -322,7 +332,7 @@ class Coordinator:
 
         for branch in branches:
             try:
-                xid = XID(gtrid=gtrid, bqual=branch.bqual)
+                xid = XID(gtrid=gtrid, bqual=branch.bqual, format_id=self.format_id)
                 self.adapter.xa_rollback(xid)
                 self.store.update_branch(
                     gtrid=gtrid,
@@ -373,6 +383,7 @@ class Coordinator:
                 max_age_seconds=max_age_seconds,
                 auto_rollback_expired=auto_rollback_expired,
                 lock_manager=self.lock_manager,
+                format_id=self.format_id,
             )
             
             duration_ms = (time.time() - start_time) * 1000
@@ -388,8 +399,8 @@ class Coordinator:
         self,
         gtrid: str,
         bqual: str,
-        format_id: Optional[int] = None,
-    ) -> Optional[BranchState]:
+        format_id: int | None = None,
+    ) -> BranchState | None:
         """Reconcile branch state by checking XA RECOVER.
 
         Useful for determining if a branch was prepared after connection loss.
@@ -398,7 +409,8 @@ class Coordinator:
         Args:
             gtrid: Global transaction ID
             bqual: Branch qualifier
-            format_id: Optional format ID to match. If None, matches any format_id.
+            format_id: Optional format ID to match. If None, defaults to
+                self.format_id. Pass an explicit value to override.
 
         Returns:
             BranchState if found in XA RECOVER, None otherwise
@@ -408,6 +420,7 @@ class Coordinator:
             from the database. For batch reconciliation of multiple transactions,
             use gc() instead, which is more efficient.
         """
+        effective_format_id = format_id if format_id is not None else self.format_id
         recovered_xids = self.adapter.xa_recover()
         
         # Search for matching XID with early exit
@@ -416,7 +429,7 @@ class Coordinator:
             if recovered_xid.gtrid != gtrid or recovered_xid.bqual != bqual:
                 continue
 
-            if format_id is not None and recovered_xid.format_id != format_id:
+            if recovered_xid.format_id != effective_format_id:
                 continue
 
             matching_xid = recovered_xid

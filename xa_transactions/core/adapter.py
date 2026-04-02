@@ -1,6 +1,9 @@
 """MySQL XA adapter implementation."""
 
-from typing import Any, Optional, List, Tuple
+from __future__ import annotations
+
+from collections.abc import Generator
+from typing import Any
 from contextlib import contextmanager
 from xa_transactions.types.types import XID
 from xa_transactions.types.protocols import Connection, XAAdapterProtocol
@@ -14,15 +17,17 @@ class MySQLXAAdapter:
     Works with mysql.connector, PyMySQL, mysqlclient, etc.
     """
 
-    def __init__(self, connection: Connection):
+    def __init__(self, connection: Connection, format_id: int = 1):
         """Initialize MySQL XA adapter.
 
         Args:
             connection: MySQL connection object (mysql.connector, PyMySQL, etc.)
+            format_id: XA format ID to use when constructing XIDs
         """
         self.connection = connection
+        self.format_id = format_id
 
-    def _execute(self, sql: str, params: Optional[Tuple[Any, ...]] = None) -> Any:
+    def _execute(self, sql: str, params: tuple[Any, ...] | None = None) -> Any:
         """Execute SQL statement.
 
         Args:
@@ -162,7 +167,7 @@ class MySQLXAAdapter:
         except Exception as e:
             raise XAAdapterError(f"XA ROLLBACK failed: {e}") from e
 
-    def xa_recover(self) -> List[XID]:
+    def xa_recover(self) -> list[XID]:
         """Recover prepared XA transactions.
 
         Returns:
@@ -200,7 +205,7 @@ class MySQLXAAdapter:
         except Exception as e:
             raise XAAdapterError(f"XA RECOVER failed: {e}") from e
 
-    def execute(self, sql: str, params: Optional[Tuple[Any, ...]] = None) -> Any:
+    def execute(self, sql: str, params: tuple[Any, ...] | None = None) -> Any:
         """Execute a regular SQL statement within the current XA transaction.
 
         Args:
@@ -213,7 +218,7 @@ class MySQLXAAdapter:
         return self._execute(sql, params)
 
     @contextmanager
-    def branch_transaction(self, gtrid: str, bqual: str, auto_commit_django: bool = False):
+    def branch_transaction(self, gtrid: str, bqual: str, auto_commit_django: bool = False) -> Generator[MySQLXAAdapter, None, None]:
         """Context manager for a branch transaction.
 
         Automatically handles XA START, END, and PREPARE.
@@ -232,7 +237,7 @@ class MySQLXAAdapter:
             with adapter.branch_transaction(gtrid, bqual):
                 adapter.execute("INSERT INTO ...")
         """
-        xid = XID(gtrid=gtrid, bqual=bqual)
+        xid = XID(gtrid=gtrid, bqual=bqual, format_id=self.format_id)
         
         # Set XA state for Django integration
         try:
@@ -247,6 +252,10 @@ class MySQLXAAdapter:
             self.xa_end(xid)
             self.xa_prepare(xid)
         except Exception:
+            try:
+                self.xa_end(xid)
+            except XAAdapterError:
+                pass
             try:
                 self.xa_rollback(xid)
             except XAAdapterError:
