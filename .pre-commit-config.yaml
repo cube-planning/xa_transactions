@@ -1,4 +1,4 @@
-# Install: pip install pre-commit && pre-commit install
+# Requires: pip install -e ".[dev]" (includes pre-commit), then pre-commit install.
 # Run manually: pre-commit run --all-files
 
 repos:

@@ -71,6 +71,11 @@ main() {
     die "no pyproject.toml, setup.cfg, or setup.py found"
   fi
 
+  if [[ "${PIP_EXTRAS}" == *"dev"* ]] && "$py" -m pre_commit --version &>/dev/null; then
+    echo "Installing pre-commit git hooks ..."
+    "$py" -m pre_commit install
+  fi
+
   echo ""
   echo "Setup complete."
   echo "Activate the environment:"

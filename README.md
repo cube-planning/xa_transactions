@@ -68,11 +68,14 @@ source .venv/bin/activate   # Linux / macOS
 # .venv\Scripts\activate    # Windows (cmd/PowerShell)
 python -m pip install -U pip
 python -m pip install -e ".[dev]"
+pre-commit install
 ```
 
-That installs the package in editable mode plus dev tools (Ruff, pytest, pre-commit). Optional extras: `pip install -e ".[dev,celery]"` if you need Celery locally.
+**Required for development:** the **`dev`** extra installs the editable package plus **Ruff**, **pytest**, **pytest-cov**, and the **`pre-commit`** CLI. You must run **`pre-commit install`** once per clone (after the venv has those packages) so Git runs the hooks; [`scripts/setup_local_env.sh`](scripts/setup_local_env.sh) does this automatically when extras include `dev`.
 
-**Git hooks (recommended):** after installing dev deps, run `pre-commit install` once. Commits then run **Ruff** on `xa_transactions/` and `tests/` (same scope as CI) and **unit tests only** via [`scripts/pre_commit_pytest_unit.sh`](scripts/pre_commit_pytest_unit.sh) (prefers `.venv/bin/python` when present; same `-m "not celery and not django"` as default `pytest`). Integration tests with `@pytest.mark.celery` / `django` are not run. Run everything manually with `pre-commit run --all-files`.
+Hooks (see [`.pre-commit-config.yaml`](.pre-commit-config.yaml)): **Ruff** on `xa_transactions/` and `tests/` (same scope as CI) and **unit tests only** via [`scripts/pre_commit_pytest_unit.sh`](scripts/pre_commit_pytest_unit.sh) (prefers `.venv/bin/python`; same `-m "not celery and not django"` as default `pytest`). Integration tests with `@pytest.mark.celery` / `django` are not run in the hook. Run the same checks manually with `pre-commit run --all-files`.
+
+Optional extras: `pip install -e ".[dev,celery]"` if you need Celery locally (still use `dev` for hooks and tooling).
 
 Building **`mysqlclient`** may require MySQL/MariaDB client libraries and build tools on your OS; if install fails, use **`PyMySQL`** (already a dependency) or install the client headers first.
 
@@ -82,7 +85,7 @@ Optional helpers (same end state as the commands above):
 ./scripts/check_dev_dependencies.sh           # macOS only: summarize missing deps, then [y/n/a] per install (a = yes to rest); full report after
 ./scripts/check_dev_dependencies.sh --dry-run # only missing deps, one line each (missing:… / optional:…)
 ./scripts/check_dev_dependencies.sh -y        # non-interactive: brew + pyenv (does not change default python3 / pyenv global)
-./scripts/setup_local_env.sh        # create .venv and pip install -e ".[dev]"
+./scripts/setup_local_env.sh        # create .venv, pip install -e ".[dev]", pre-commit install
 ```
 
 ### Testing
