@@ -28,6 +28,7 @@ Use a **venv** and **pip** — see **Development** in [README.md](../README.md) 
 
 ## Verify changes
 
+- **Pre-commit** (optional but recommended): `pre-commit install` after `pip install -e ".[dev]"` — runs Ruff (`xa_transactions/`, `tests/` only, same as CI) + unit-only `pytest` on commit ([.pre-commit-config.yaml](../.pre-commit-config.yaml), [scripts/pre_commit_pytest_unit.sh](../scripts/pre_commit_pytest_unit.sh) prefers `.venv`). Manual: `pre-commit run --all-files`.
 - **Lint / format**: `ruff check xa_transactions tests` and `ruff format --check xa_transactions tests` (after `pip install -e ".[dev]"`; see [README.md](../README.md)).
 - **Unit tests + coverage**: `pytest --cov=xa_transactions --cov-report=term-missing` (default run skips `@pytest.mark.celery` / `django` tests; see **Testing** in README).
 - **Optional integration tests**: `pip install -e ".[dev,celery,django]"` then `pytest -m "celery or django" -v`.

@@ -1,0 +1,24 @@
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.9
+    hooks:
+      - id: ruff
+        args: [--fix, xa_transactions, tests]
+        pass_filenames: false
+        always_run: true
+      - id: ruff-format
+        args: [xa_transactions, tests]
+        pass_filenames: false
+        always_run: true
+
+  - repo: local
+    hooks:
+      - id: pytest-unit
+        name: pytest (unit only; excludes celery/django markers)
+        entry: bash scripts/pre_commit_pytest_unit.sh
+        language: system
+        pass_filenames: false
+        always_run: true

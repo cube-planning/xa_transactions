@@ -70,7 +70,9 @@ python -m pip install -U pip
 python -m pip install -e ".[dev]"
 ```
 
-That installs the package in editable mode plus dev tools (e.g. Ruff). Optional extras: `pip install -e ".[dev,celery]"` if you need Celery locally.
+That installs the package in editable mode plus dev tools (Ruff, pytest, pre-commit). Optional extras: `pip install -e ".[dev,celery]"` if you need Celery locally.
+
+**Git hooks (recommended):** after installing dev deps, run `pre-commit install` once. Commits then run **Ruff** on `xa_transactions/` and `tests/` (same scope as CI) and **unit tests only** via [`scripts/pre_commit_pytest_unit.sh`](scripts/pre_commit_pytest_unit.sh) (prefers `.venv/bin/python` when present; same `-m "not celery and not django"` as default `pytest`). Integration tests with `@pytest.mark.celery` / `django` are not run. Run everything manually with `pre-commit run --all-files`.
 
 Building **`mysqlclient`** may require MySQL/MariaDB client libraries and build tools on your OS; if install fails, use **`PyMySQL`** (already a dependency) or install the client headers first.
 
