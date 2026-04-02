@@ -12,6 +12,7 @@ Commit messages follow the [Conventional Commits](https://www.conventionalcommit
 ### Added
 
 - **GitHub Actions:** [`.github/workflows/tag-on-main.yml`](.github/workflows/tag-on-main.yml) — on push to `main`, create `v<version>` from `pyproject.toml` if missing on the remote.
+- **Unit tests:** expanded [`tests/test_types.py`](tests/test_types.py); [`tests/test_coordinator_unit.py`](tests/test_coordinator_unit.py) exercises `Coordinator` with mocked store/adapter (finalize, reconcile_branch, validation paths).
 
 ### Changed
 
