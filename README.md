@@ -58,6 +58,8 @@ pip install xa-transactions[celery]
 
 ## Development
 
+Release history: [CHANGELOG.md](CHANGELOG.md). Commits use [Conventional Commits](https://www.conventionalcommits.org/) via [Commitizen](https://commitizen-tools.github.io/commitizen/) (`pip install -e ".[dev]"` includes `cz`; use **`git cz`** to commit).
+
 Use a **virtual environment** and **pip** (do not install into the system interpreter).
 
 From the repository root:

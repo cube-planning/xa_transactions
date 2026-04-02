@@ -18,6 +18,7 @@ Python **3.10+** library: coordinate **MySQL XA (two-phase commit)** across **pa
 ## Human docs (read before large design changes)
 
 - [README.md](../README.md) — overview and quick start
+- [CHANGELOG.md](../CHANGELOG.md) — release history (update `[Unreleased]` when changing user-visible behavior)
 - [ARCHITECTURE.md](../ARCHITECTURE.md) — design detail
 - [docs/CELERY.md](../docs/CELERY.md) — Celery usage
 - [docs/DJANGO.md](../docs/DJANGO.md) — Django usage
@@ -36,6 +37,7 @@ Use a **venv** and **pip** — see **Development** in [README.md](../README.md) 
 
 ## Conventions for edits
 
+- **Commits**: [Commitizen](https://commitizen-tools.github.io/commitizen/) — `git cz` (included in **`[dev]`**); config in [`pyproject.toml`](../pyproject.toml) under `[tool.commitizen]`.
 - Prefer **type hints** (`T | None`, not `Optional[T]`, without relying on `from __future__ import annotations` — **Python 3.10+** is required).
 - Treat **`StoreProtocol`** and **`xa_transactions/__init__.py`** exports as API: breaking changes need intent and changelog consideration.
 - Optional deps: Celery/Django code paths should remain import-safe when extras are not installed (see patterns in `__init__.py`).
