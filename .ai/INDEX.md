@@ -24,7 +24,7 @@ Python **3.10+** library: coordinate **MySQL XA (two-phase commit)** across **pa
 
 ## Local environment
 
-Use a **venv** and **pip** — see **Development** in [README.md](../README.md) (`python3 -m venv .venv`, activate, `pip install -e ".[dev]"`). Optional: [scripts/check_dev_dependencies.sh](../scripts/check_dev_dependencies.sh) (informational checks) then [scripts/setup_local_env.sh](../scripts/setup_local_env.sh) (venv + editable install).
+Use a **venv** and **pip** — see **Development** in [README.md](../README.md) (`python3 -m venv .venv`, activate, `pip install -e ".[dev]"`). Optional: [scripts/check_dev_dependencies.sh](../scripts/check_dev_dependencies.sh) (**macOS only**, **Homebrew**; assumes **git**; interactive **y/n/a**; **`--dry-run`** / **`-y`**) then [scripts/setup_local_env.sh](../scripts/setup_local_env.sh) (venv + editable install).
 
 ## Verify changes
 

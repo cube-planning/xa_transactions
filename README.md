@@ -77,7 +77,9 @@ Building **`mysqlclient`** may require MySQL/MariaDB client libraries and build 
 Optional helpers (same end state as the commands above):
 
 ```bash
-./scripts/check_dev_dependencies.sh   # informational: git, python, pip, optional pyenv, build hints
+./scripts/check_dev_dependencies.sh           # macOS only: summarize missing deps, then [y/n/a] per install (a = yes to rest); full report after
+./scripts/check_dev_dependencies.sh --dry-run # only missing deps, one line each (missing:… / optional:…)
+./scripts/check_dev_dependencies.sh -y        # non-interactive: brew + pyenv (does not change default python3 / pyenv global)
 ./scripts/setup_local_env.sh        # create .venv and pip install -e ".[dev]"
 ```
 
