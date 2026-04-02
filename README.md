@@ -60,6 +60,10 @@ pip install xa-transactions[celery]
 
 Release history: [CHANGELOG.md](CHANGELOG.md). Commits use [Conventional Commits](https://www.conventionalcommits.org/) via [Commitizen](https://commitizen-tools.github.io/commitizen/) (`pip install -e ".[dev]"` includes `cz`; use **`git cz`** to commit).
 
+**Changelog automation** ([`pyproject.toml`](pyproject.toml) `[tool.commitizen]`): **`cz bump`** updates **`CHANGELOG.md`** from the commit range since the last tag (`changelog_incremental`, `update_changelog_on_bump`). To regenerate without bumping: **`cz changelog --incremental`** (preview with **`cz changelog --dry-run --incremental`**). Generated sections use Conventional Commit types (**feat** / **fix** / …), not always Keep a Changelog’s **Added** / **Changed** — edit for wording or categories after generation if you care.
+
+**Tags on `main`:** after each merge to `main`, [`.github/workflows/tag-on-main.yml`](.github/workflows/tag-on-main.yml) creates the git tag `v<version>` from `[project].version` in [`pyproject.toml`](pyproject.toml) if that tag does not already exist on the remote (bump the version in `pyproject.toml` when you release).
+
 Use a **virtual environment** and **pip** (do not install into the system interpreter).
 
 From the repository root:

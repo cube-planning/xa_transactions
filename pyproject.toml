@@ -104,3 +104,8 @@ version_files = [
     "pyproject.toml:version",
     "xa_transactions/__init__.py:__version__",
 ]
+# Keep a Changelog–compatible output; see https://commitizen-tools.github.io/commitizen/commands/changelog/
+changelog_file = "CHANGELOG.md"
+update_changelog_on_bump = true
+changelog_incremental = true
+changelog_start_rev = "v0.1.0"

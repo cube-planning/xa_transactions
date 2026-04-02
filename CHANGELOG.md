@@ -11,6 +11,8 @@ Commit messages follow the [Conventional Commits](https://www.conventionalcommit
 
 ### Added
 
+- **GitHub Actions:** [`.github/workflows/tag-on-main.yml`](.github/workflows/tag-on-main.yml) — on push to `main`, create `v<version>` from `pyproject.toml` if missing on the remote.
+
 ### Changed
 
 ### Fixed
