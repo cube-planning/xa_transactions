@@ -1,5 +1,7 @@
 """Celery integration helpers for XA transactions."""
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from functools import wraps
 from typing import Any
@@ -39,12 +41,14 @@ class XATask(Task):
         self._xa_adapter: XAAdapter | None = None
         self._xa_gtrid: str | None = None
         self._xa_bqual: str | None = None
+        self._xa_format_id: int = 1
 
     def set_xa_context(
         self,
         adapter: XAAdapterProtocol,
         gtrid: str,
         bqual: str,
+        format_id: int = 1,
     ) -> None:
         """Set XA context for this task.
 
@@ -52,22 +56,25 @@ class XATask(Task):
             adapter: XA adapter instance
             gtrid: Global transaction ID
             bqual: Branch qualifier
+            format_id: XA format ID for XID construction
         """
         self._xa_adapter = adapter
         self._xa_gtrid = gtrid
         self._xa_bqual = bqual
+        self._xa_format_id = format_id
 
     def get_xa_context(self) -> dict[str, Any] | None:
         """Get XA context from task.
 
         Returns:
-            Dict with adapter, gtrid, bqual or None
+            Dict with adapter, gtrid, bqual, format_id or None
         """
         if self._xa_adapter and self._xa_gtrid and self._xa_bqual:
             return {
                 "adapter": self._xa_adapter,
                 "gtrid": self._xa_gtrid,
                 "bqual": self._xa_bqual,
+                "format_id": self._xa_format_id,
             }
         return None
 
@@ -80,7 +87,8 @@ class XATask(Task):
         adapter = xa_context["adapter"]
         gtrid = xa_context["gtrid"]
         bqual = xa_context["bqual"]
-        xid = XID(gtrid=gtrid, bqual=bqual)
+        format_id = xa_context["format_id"]
+        xid = XID(gtrid=gtrid, bqual=bqual, format_id=format_id)
 
         # Set XA state for Django integration
         try:
@@ -97,6 +105,10 @@ class XATask(Task):
             adapter.xa_prepare(xid)
             return result
         except Exception:
+            try:
+                adapter.xa_end(xid)
+            except Exception:
+                pass
             try:
                 adapter.xa_rollback(xid)
             except Exception:
@@ -116,6 +128,7 @@ def xa_task(
     adapter_factory: Callable[[], XAAdapterProtocol],
     gtrid_key: str = "xa_gtrid",
     bqual_key: str = "xa_bqual",
+    format_id: int = 1,
 ):
     """Decorator for Celery tasks to automatically handle XA transactions.
 
@@ -123,6 +136,7 @@ def xa_task(
         adapter_factory: Function that returns an XAAdapter instance
         gtrid_key: Key in kwargs for global transaction ID
         bqual_key: Key in kwargs for branch qualifier
+        format_id: XA format ID for XID construction
 
     Returns:
         Decorated task function
@@ -146,7 +160,7 @@ def xa_task(
                 return func(*args, **kwargs)
 
             adapter = adapter_factory()
-            xid = XID(gtrid=gtrid, bqual=bqual)
+            xid = XID(gtrid=gtrid, bqual=bqual, format_id=format_id)
 
             # Set XA state for Django integration
             try:
@@ -163,6 +177,10 @@ def xa_task(
                 adapter.xa_prepare(xid)
                 return result
             except Exception:
+                try:
+                    adapter.xa_end(xid)
+                except Exception:
+                    pass
                 try:
                     adapter.xa_rollback(xid)
                 except Exception:

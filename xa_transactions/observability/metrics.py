@@ -1,5 +1,7 @@
 """Default implementations for metrics collection."""
 
+from __future__ import annotations
+
 from typing import Any
 
 from xa_transactions.types.types import Decision

@@ -1,5 +1,7 @@
 """MySQL-based coordinator store implementation."""
 
+from __future__ import annotations
+
 from datetime import datetime, timezone
 
 from xa_transactions.types.exceptions import StoreError

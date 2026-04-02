@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "xa-transactions"
-version = "0.1.0"
+version = "0.2.0"
 description = "MySQL XA (2-phase commit) transaction coordination library for parallel workers"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -47,6 +47,9 @@ Homepage = "https://github.com/yourusername/xa-transactions"
 Documentation = "https://github.com/yourusername/xa-transactions#readme"
 Repository = "https://github.com/yourusername/xa-transactions"
 
+[tool.setuptools.package-data]
+xa_transactions = ["py.typed"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["xa_transactions*"]
@@ -85,3 +88,9 @@ omit = ["*/tests/*"]
 
 [tool.coverage.report]
 show_missing = true
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true

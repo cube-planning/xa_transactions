@@ -1,5 +1,7 @@
 """Protocol definitions for pluggable implementations."""
 
+from __future__ import annotations
+
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Protocol
@@ -400,6 +402,7 @@ class RecoveryStrategy(Protocol):
         store: StoreProtocol,
         max_age_seconds: int,
         auto_rollback_expired: bool,
+        format_id: int = 1,
     ) -> int:
         """Recover in-doubt transactions.
 
@@ -410,6 +413,7 @@ class RecoveryStrategy(Protocol):
             store: Store for updating state
             max_age_seconds: Maximum age for expired transactions
             auto_rollback_expired: If True, auto-rollback expired UNKNOWN transactions
+            format_id: XA format ID for XID construction during recovery
 
         Returns:
             Number of transactions recovered
@@ -496,7 +500,7 @@ class LockHandle(Protocol):
     Used for lock renewal and explicit release. Can be used as a context manager.
     """
 
-    def __enter__(self) -> "LockHandle":
+    def __enter__(self) -> LockHandle:
         """Enter context manager."""
         ...
 

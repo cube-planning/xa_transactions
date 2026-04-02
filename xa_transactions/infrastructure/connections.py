@@ -1,5 +1,7 @@
 """Connection factory implementations."""
 
+from __future__ import annotations
+
 from typing import Any
 
 from xa_transactions.types.protocols import Connection
