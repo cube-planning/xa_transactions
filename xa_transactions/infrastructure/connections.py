@@ -1,7 +1,8 @@
 """Connection factory implementations."""
 
-from typing import Optional
-from xa_transactions.types.protocols import Connection, ConnectionFactory
+from typing import Any
+
+from xa_transactions.types.protocols import Connection
 
 
 class SimpleConnectionFactory:

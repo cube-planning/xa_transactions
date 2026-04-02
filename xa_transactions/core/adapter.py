@@ -1,10 +1,11 @@
 """MySQL XA adapter implementation."""
 
-from typing import Any, Optional, List, Tuple
 from contextlib import contextmanager
-from xa_transactions.types.types import XID
-from xa_transactions.types.protocols import Connection, XAAdapterProtocol
+from typing import Any
+
 from xa_transactions.types.exceptions import XAAdapterError
+from xa_transactions.types.protocols import Connection
+from xa_transactions.types.types import XID
 
 
 class MySQLXAAdapter:
@@ -22,7 +23,7 @@ class MySQLXAAdapter:
         """
         self.connection = connection
 
-    def _execute(self, sql: str, params: Optional[Tuple[Any, ...]] = None) -> Any:
+    def _execute(self, sql: str, params: tuple[Any, ...] | None = None) -> Any:
         """Execute SQL statement.
 
         Args:
@@ -60,7 +61,7 @@ class MySQLXAAdapter:
         # Check for Django transaction
         try:
             from xa_transactions.integrations.django import is_django_transaction_active
-            
+
             if is_django_transaction_active():
                 if not auto_commit_django:
                     raise XAAdapterError(
@@ -71,6 +72,7 @@ class MySQLXAAdapter:
                 # Auto-commit Django transaction if requested
                 try:
                     from django.db import transaction
+
                     transaction.commit()
                 except Exception as e:
                     raise XAAdapterError(
@@ -78,7 +80,7 @@ class MySQLXAAdapter:
                     ) from e
         except ImportError:
             pass  # Django not available
-        
+
         try:
             sql = f"XA START {xid.to_sql()}"
             cursor = self._execute(sql)
@@ -162,7 +164,7 @@ class MySQLXAAdapter:
         except Exception as e:
             raise XAAdapterError(f"XA ROLLBACK failed: {e}") from e
 
-    def xa_recover(self) -> List[XID]:
+    def xa_recover(self) -> list[XID]:
         """Recover prepared XA transactions.
 
         Returns:
@@ -181,7 +183,7 @@ class MySQLXAAdapter:
                     if len(row) < 4:
                         continue
                     format_id, gtrid_len, bqual_len, data = row[0], row[1], row[2], row[3]
-                    
+
                     if isinstance(data, bytes):
                         gtrid = data[:gtrid_len].decode("utf-8")
                         bqual = data[gtrid_len : gtrid_len + bqual_len].decode("utf-8")
@@ -190,7 +192,7 @@ class MySQLXAAdapter:
                         bqual = data[gtrid_len : gtrid_len + bqual_len]
                     else:
                         continue
-                        
+
                     xids.append(XID(gtrid=gtrid, bqual=bqual, format_id=format_id))
                 return xids
             finally:
@@ -200,7 +202,7 @@ class MySQLXAAdapter:
         except Exception as e:
             raise XAAdapterError(f"XA RECOVER failed: {e}") from e
 
-    def execute(self, sql: str, params: Optional[Tuple[Any, ...]] = None) -> Any:
+    def execute(self, sql: str, params: tuple[Any, ...] | None = None) -> Any:
         """Execute a regular SQL statement within the current XA transaction.
 
         Args:
@@ -233,14 +235,15 @@ class MySQLXAAdapter:
                 adapter.execute("INSERT INTO ...")
         """
         xid = XID(gtrid=gtrid, bqual=bqual)
-        
+
         # Set XA state for Django integration
         try:
             from xa_transactions.integrations.django import set_xa_active
+
             set_xa_active(True)
         except ImportError:
             pass  # Django not available
-        
+
         try:
             self.xa_start(xid, auto_commit_django=auto_commit_django)
             yield self
@@ -256,6 +259,7 @@ class MySQLXAAdapter:
             # Clear XA state
             try:
                 from xa_transactions.integrations.django import set_xa_active
+
                 set_xa_active(False)
             except ImportError:
                 pass

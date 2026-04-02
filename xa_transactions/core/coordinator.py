@@ -1,47 +1,45 @@
 """Coordinator for XA transaction management."""
 
-import uuid
 import time
+import uuid
+from collections.abc import Callable
 from contextlib import nullcontext
-from typing import List, Optional, Callable
 from datetime import datetime, timezone
-from xa_transactions.core.adapter import MySQLXAAdapter
-from xa_transactions.types.protocols import (
-    Connection,
-    StoreProtocol,
-    XAAdapterProtocol,
-    TransactionHooks,
-    RecoveryStrategy,
-    MetricsCollector,
-    LockManager,
-)
+
 from xa_transactions.core.store import MySQLStore
+from xa_transactions.infrastructure.recovery import DefaultRecoveryStrategy
 from xa_transactions.observability.hooks import NoOpHooks
 from xa_transactions.observability.metrics import NoOpMetrics
-from xa_transactions.infrastructure.recovery import DefaultRecoveryStrategy
 from xa_transactions.types.exceptions import (
     CoordinatorError,
-    ValidationError,
     FinalizationError,
-    LockError,
+    ValidationError,
+)
+from xa_transactions.types.protocols import (
+    Connection,
+    LockManager,
+    MetricsCollector,
+    RecoveryStrategy,
+    StoreProtocol,
+    TransactionHooks,
+    XAAdapterProtocol,
 )
 from xa_transactions.types.types import (
+    XID,
+    BranchState,
+    BranchTransaction,
     Decision,
     GlobalState,
-    BranchState,
-    XID,
-    GlobalTransaction,
-    BranchTransaction,
 )
 
 
 def create_coordinator(
     adapter: XAAdapterProtocol,
     store_connection: Connection,
-    branch_id_generator: Optional[Callable[[int], str]] = None,
-    hooks: Optional[TransactionHooks] = None,
-    metrics: Optional[MetricsCollector] = None,
-    lock_manager: Optional[LockManager] = None,
+    branch_id_generator: Callable[[int], str] | None = None,
+    hooks: TransactionHooks | None = None,
+    metrics: MetricsCollector | None = None,
+    lock_manager: LockManager | None = None,
 ) -> "Coordinator":
     """Convenience function to create a Coordinator with MySQLStore.
 
@@ -80,11 +78,11 @@ class Coordinator:
         self,
         adapter: XAAdapterProtocol,
         store: StoreProtocol,
-        branch_id_generator: Optional[Callable[[int], str]] = None,
-        hooks: Optional[TransactionHooks] = None,
-        metrics: Optional[MetricsCollector] = None,
-        recovery_strategy: Optional[RecoveryStrategy] = None,
-        lock_manager: Optional[LockManager] = None,
+        branch_id_generator: Callable[[int], str] | None = None,
+        hooks: TransactionHooks | None = None,
+        metrics: MetricsCollector | None = None,
+        recovery_strategy: RecoveryStrategy | None = None,
+        lock_manager: LockManager | None = None,
     ):
         """Initialize coordinator.
 
@@ -110,7 +108,7 @@ class Coordinator:
             lambda idx: f"branch_{idx:04d}_{uuid.uuid4().hex[:8]}"
         )
 
-    def create_global(self, expected_branches: int, gtrid: Optional[str] = None) -> str:
+    def create_global(self, expected_branches: int, gtrid: str | None = None) -> str:
         """Create a new global transaction.
 
         Args:
@@ -136,9 +134,9 @@ class Coordinator:
     def create_branches(
         self,
         gtrid: str,
-        count: Optional[int] = None,
-        bquals: Optional[List[str]] = None,
-    ) -> List[str]:
+        count: int | None = None,
+        bquals: list[str] | None = None,
+    ) -> list[str]:
         """Create branch transaction records.
 
         Args:
@@ -183,7 +181,7 @@ class Coordinator:
         """
         # Optional per-branch locking (less critical than finalize)
         lock_key = f"xa:branch:{gtrid}:{bqual}"
-        
+
         if self.lock_manager:
             lock_context = self.lock_manager.acquire(lock_key, timeout=10.0, blocking=True)
         else:
@@ -222,7 +220,7 @@ class Coordinator:
             raise ValidationError("Cannot finalize with UNKNOWN decision")
 
         lock_key = f"xa:finalize:{gtrid}"
-        
+
         # Acquire lock FIRST to prevent TOCTOU race conditions
         if self.lock_manager:
             lock_context = self.lock_manager.acquire(lock_key, timeout=60.0, blocking=True)
@@ -244,18 +242,19 @@ class Coordinator:
 
             if not force and len(prepared_branches) < global_tx.expected_count:
                 raise ValidationError(
-                    f"Not all branches prepared: {len(prepared_branches)}/{global_tx.expected_count}"
+                    "Not all branches prepared: "
+                    f"{len(prepared_branches)}/{global_tx.expected_count}"
                 )
 
             start_time = time.time()
             self.hooks.on_finalization_started(gtrid, decision)
-            
+
             try:
                 if decision == Decision.COMMIT:
                     self._commit_global(gtrid, prepared_branches)
                 else:
                     self._rollback_global(gtrid, prepared_branches)
-                
+
                 duration_ms = (time.time() - start_time) * 1000
                 self.hooks.on_finalization_completed(gtrid, decision)
                 self.metrics.record_finalization(gtrid, decision, True, duration_ms)
@@ -269,7 +268,7 @@ class Coordinator:
     def _commit_global(
         self,
         gtrid: str,
-        branches: List[BranchTransaction],
+        branches: list[BranchTransaction],
     ) -> None:
         """Commit a global transaction.
 
@@ -293,9 +292,7 @@ class Coordinator:
                     state=BranchState.COMMITTED,
                 )
             except Exception as e:
-                raise FinalizationError(
-                    f"Failed to commit branch {branch.bqual}: {e}"
-                ) from e
+                raise FinalizationError(f"Failed to commit branch {branch.bqual}: {e}") from e
 
         self.store.update_global(
             gtrid=gtrid,
@@ -306,7 +303,7 @@ class Coordinator:
     def _rollback_global(
         self,
         gtrid: str,
-        branches: List[BranchTransaction],
+        branches: list[BranchTransaction],
     ) -> None:
         """Rollback a global transaction.
 
@@ -330,9 +327,7 @@ class Coordinator:
                     state=BranchState.ROLLED_BACK,
                 )
             except Exception as e:
-                raise FinalizationError(
-                    f"Failed to rollback branch {branch.bqual}: {e}"
-                ) from e
+                raise FinalizationError(f"Failed to rollback branch {branch.bqual}: {e}") from e
 
         self.store.update_global(
             gtrid=gtrid,
@@ -358,13 +353,13 @@ class Coordinator:
             Number of transactions recovered
         """
         start_time = time.time()
-        
+
         try:
             recovered_xids = self.adapter.xa_recover()
             incomplete_globals = self.store.get_incomplete_globals(
                 max_age_seconds=max_age_seconds,
             )
-            
+
             recovered = self.recovery_strategy.recover(
                 incomplete_globals=incomplete_globals,
                 recovered_xids=recovered_xids,
@@ -374,7 +369,7 @@ class Coordinator:
                 auto_rollback_expired=auto_rollback_expired,
                 lock_manager=self.lock_manager,
             )
-            
+
             duration_ms = (time.time() - start_time) * 1000
             self.metrics.record_gc_run(recovered, duration_ms)
             return recovered
@@ -388,8 +383,8 @@ class Coordinator:
         self,
         gtrid: str,
         bqual: str,
-        format_id: Optional[int] = None,
-    ) -> Optional[BranchState]:
+        format_id: int | None = None,
+    ) -> BranchState | None:
         """Reconcile branch state by checking XA RECOVER.
 
         Useful for determining if a branch was prepared after connection loss.
@@ -409,7 +404,7 @@ class Coordinator:
             use gc() instead, which is more efficient.
         """
         recovered_xids = self.adapter.xa_recover()
-        
+
         # Search for matching XID with early exit
         matching_xid = None
         for recovered_xid in recovered_xids:
@@ -421,14 +416,14 @@ class Coordinator:
 
             matching_xid = recovered_xid
             break
-        
+
         if matching_xid is None:
             return None
-        
+
         # Branch is prepared in database - reconcile with store
         branch = self.store.get_branch(gtrid, bqual)
         prepared_time = datetime.now(timezone.utc)
-        
+
         if not branch:
             # Branch doesn't exist in store - create it
             self.store.create_branch(
@@ -445,5 +440,5 @@ class Coordinator:
                 state=BranchState.PREPARED,
                 prepared_at=prepared_time,
             )
-        
+
         return BranchState.PREPARED

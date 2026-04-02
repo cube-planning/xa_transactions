@@ -1,15 +1,16 @@
 """Protocol definitions for pluggable implementations."""
 
-from typing import Protocol, List, Optional, Tuple, Any
 from contextlib import contextmanager
 from datetime import datetime
+from typing import Any, Protocol
+
 from xa_transactions.types.types import (
+    XID,
+    BranchState,
+    BranchTransaction,
     Decision,
     GlobalState,
-    BranchState,
     GlobalTransaction,
-    BranchTransaction,
-    XID,
 )
 
 
@@ -51,7 +52,7 @@ class StoreProtocol(Protocol):
         """
         ...
 
-    def get_global(self, gtrid: str) -> Optional[GlobalTransaction]:
+    def get_global(self, gtrid: str) -> GlobalTransaction | None:
         """Get global transaction by gtrid.
 
         Args:
@@ -65,9 +66,9 @@ class StoreProtocol(Protocol):
     def update_global(
         self,
         gtrid: str,
-        decision: Optional[Decision] = None,
-        state: Optional[GlobalState] = None,
-        finalized_at: Optional[datetime] = None,
+        decision: Decision | None = None,
+        state: GlobalState | None = None,
+        finalized_at: datetime | None = None,
     ) -> None:
         """Update global transaction.
 
@@ -84,7 +85,7 @@ class StoreProtocol(Protocol):
         gtrid: str,
         bqual: str,
         state: BranchState = BranchState.EXPECTED,
-        prepared_at: Optional[datetime] = None,
+        prepared_at: datetime | None = None,
     ) -> BranchTransaction:
         """Create a branch transaction record.
 
@@ -106,7 +107,7 @@ class StoreProtocol(Protocol):
         self,
         gtrid: str,
         bqual: str,
-    ) -> Optional[BranchTransaction]:
+    ) -> BranchTransaction | None:
         """Get branch transaction.
 
         Args:
@@ -122,8 +123,8 @@ class StoreProtocol(Protocol):
         self,
         gtrid: str,
         bqual: str,
-        state: Optional[BranchState] = None,
-        prepared_at: Optional[datetime] = None,
+        state: BranchState | None = None,
+        prepared_at: datetime | None = None,
     ) -> None:
         """Update branch transaction.
 
@@ -135,7 +136,7 @@ class StoreProtocol(Protocol):
         """
         ...
 
-    def get_branches(self, gtrid: str) -> List[BranchTransaction]:
+    def get_branches(self, gtrid: str) -> list[BranchTransaction]:
         """Get all branches for a global transaction.
 
         Args:
@@ -146,7 +147,7 @@ class StoreProtocol(Protocol):
         """
         ...
 
-    def get_prepared_branches(self, gtrid: str) -> List[BranchTransaction]:
+    def get_prepared_branches(self, gtrid: str) -> list[BranchTransaction]:
         """Get all prepared branches for a global transaction.
 
         Args:
@@ -159,8 +160,8 @@ class StoreProtocol(Protocol):
 
     def get_incomplete_globals(
         self,
-        max_age_seconds: Optional[int] = None,
-    ) -> List[GlobalTransaction]:
+        max_age_seconds: int | None = None,
+    ) -> list[GlobalTransaction]:
         """Get incomplete global transactions.
 
         Args:
@@ -283,7 +284,7 @@ class XAAdapterProtocol(Protocol):
         """
         ...
 
-    def xa_recover(self) -> List[XID]:
+    def xa_recover(self) -> list[XID]:
         """Recover prepared XA transactions.
 
         Returns:
@@ -294,7 +295,7 @@ class XAAdapterProtocol(Protocol):
         """
         ...
 
-    def execute(self, sql: str, params: Optional[Tuple[Any, ...]] = None) -> Any:
+    def execute(self, sql: str, params: tuple[Any, ...] | None = None) -> Any:
         """Execute a regular SQL statement within the current XA transaction.
 
         Args:
@@ -393,8 +394,8 @@ class RecoveryStrategy(Protocol):
 
     def recover(
         self,
-        incomplete_globals: List[GlobalTransaction],
-        recovered_xids: List[XID],
+        incomplete_globals: list[GlobalTransaction],
+        recovered_xids: list[XID],
         adapter: XAAdapterProtocol,
         store: StoreProtocol,
         max_age_seconds: int,
@@ -478,7 +479,7 @@ class MetricsCollector(Protocol):
     def record_error(
         self,
         error_type: str,
-        gtrid: Optional[str] = None,
+        gtrid: str | None = None,
     ) -> None:
         """Record an error occurrence.
 
@@ -541,7 +542,7 @@ class LockManager(Protocol):
     def acquire(
         self,
         key: str,
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
         blocking: bool = True,
     ):
         """Acquire a distributed lock.
@@ -569,8 +570,8 @@ class LockManager(Protocol):
     def try_acquire(
         self,
         key: str,
-        timeout: Optional[float] = None,
-    ) -> Optional[LockHandle]:
+        timeout: float | None = None,
+    ) -> LockHandle | None:
         """Try to acquire a lock without blocking.
 
         Args:

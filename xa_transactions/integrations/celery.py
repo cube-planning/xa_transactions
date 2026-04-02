@@ -1,10 +1,12 @@
 """Celery integration helpers for XA transactions."""
 
-from typing import Any, Callable, Optional, Dict
+from collections.abc import Callable
 from functools import wraps
+from typing import Any
 
 try:
     from celery import Task, current_task
+
     CELERY_AVAILABLE = True
 except ImportError:
     CELERY_AVAILABLE = False
@@ -12,8 +14,8 @@ except ImportError:
     current_task = None
 
 from xa_transactions.core.adapter import XAAdapter
-from xa_transactions.types.protocols import XAAdapterProtocol
 from xa_transactions.core.coordinator import Coordinator
+from xa_transactions.types.protocols import XAAdapterProtocol
 from xa_transactions.types.types import XID
 
 
@@ -34,9 +36,9 @@ class XATask(Task):
     def __init__(self, *args: Any, **kwargs: Any):
         _check_celery()
         super().__init__(*args, **kwargs)
-        self._xa_adapter: Optional[XAAdapter] = None
-        self._xa_gtrid: Optional[str] = None
-        self._xa_bqual: Optional[str] = None
+        self._xa_adapter: XAAdapter | None = None
+        self._xa_gtrid: str | None = None
+        self._xa_bqual: str | None = None
 
     def set_xa_context(
         self,
@@ -55,7 +57,7 @@ class XATask(Task):
         self._xa_gtrid = gtrid
         self._xa_bqual = bqual
 
-    def get_xa_context(self) -> Optional[Dict[str, Any]]:
+    def get_xa_context(self) -> dict[str, Any] | None:
         """Get XA context from task.
 
         Returns:
@@ -83,6 +85,7 @@ class XATask(Task):
         # Set XA state for Django integration
         try:
             from xa_transactions.integrations.django import set_xa_active
+
             set_xa_active(True)
         except ImportError:
             pass  # Django not available
@@ -103,6 +106,7 @@ class XATask(Task):
             # Clear XA state
             try:
                 from xa_transactions.integrations.django import set_xa_active
+
                 set_xa_active(False)
             except ImportError:
                 pass
@@ -147,6 +151,7 @@ def xa_task(
             # Set XA state for Django integration
             try:
                 from xa_transactions.integrations.django import set_xa_active
+
                 set_xa_active(True)
             except ImportError:
                 pass  # Django not available
@@ -167,6 +172,7 @@ def xa_task(
                 # Clear XA state
                 try:
                     from xa_transactions.integrations.django import set_xa_active
+
                     set_xa_active(False)
                 except ImportError:
                     pass
@@ -180,7 +186,7 @@ def create_xa_chord(
     coordinator: Coordinator,
     branch_tasks: list,
     finalize_task: Callable,
-    expected_branches: Optional[int] = None,
+    expected_branches: int | None = None,
 ) -> tuple:
     """Create a Celery chord for XA transaction coordination.
 
@@ -223,7 +229,7 @@ def create_xa_chord(
     return gtrid, chord_result
 
 
-def get_xa_context_from_task() -> Optional[Dict[str, Any]]:
+def get_xa_context_from_task() -> dict[str, Any] | None:
     """Get XA context from current Celery task.
 
     Returns:

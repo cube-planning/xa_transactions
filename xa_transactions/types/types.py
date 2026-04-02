@@ -1,9 +1,9 @@
 """Type definitions for XA transactions."""
 
-from enum import Enum
-from typing import NamedTuple, Optional
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
+from typing import NamedTuple
 
 
 class Decision(str, Enum):
@@ -60,7 +60,7 @@ class GlobalTransaction:
     expected_count: int
     created_at: datetime
     updated_at: datetime
-    finalized_at: Optional[datetime] = None
+    finalized_at: datetime | None = None
 
 
 @dataclass
@@ -72,4 +72,4 @@ class BranchTransaction:
     state: BranchState
     created_at: datetime
     updated_at: datetime
-    prepared_at: Optional[datetime] = None
+    prepared_at: datetime | None = None

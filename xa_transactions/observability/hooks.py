@@ -1,7 +1,7 @@
 """Default implementations for transaction hooks."""
 
-from typing import Optional, Any
-from xa_transactions.types.protocols import TransactionHooks
+from typing import Any
+
 from xa_transactions.types.types import Decision
 
 
@@ -41,13 +41,14 @@ class LoggingHooks:
     Uses Python's logging module to log transaction lifecycle events.
     """
 
-    def __init__(self, logger: Optional[Any] = None):
+    def __init__(self, logger: Any | None = None):
         """Initialize logging hooks.
 
         Args:
             logger: Optional logger instance. If None, uses default logger.
         """
         import logging
+
         self.logger = logger or logging.getLogger(__name__)
 
     def on_global_created(self, gtrid: str, expected_count: int) -> None:

@@ -1,23 +1,22 @@
 """Recovery strategy implementations."""
 
-from typing import List, Optional
 from contextlib import nullcontext
 from datetime import datetime, timezone
+
+from xa_transactions.types.exceptions import FinalizationError, RecoveryError
 from xa_transactions.types.protocols import (
-    RecoveryStrategy,
-    XAAdapterProtocol,
-    StoreProtocol,
     LockManager,
+    StoreProtocol,
+    XAAdapterProtocol,
 )
 from xa_transactions.types.types import (
+    XID,
+    BranchState,
+    BranchTransaction,
     Decision,
     GlobalState,
-    BranchState,
-    XID,
     GlobalTransaction,
-    BranchTransaction,
 )
-from xa_transactions.types.exceptions import RecoveryError, FinalizationError
 
 
 class DefaultRecoveryStrategy:
@@ -31,13 +30,13 @@ class DefaultRecoveryStrategy:
 
     def recover(
         self,
-        incomplete_globals: List[GlobalTransaction],
-        recovered_xids: List[XID],
+        incomplete_globals: list[GlobalTransaction],
+        recovered_xids: list[XID],
         adapter: XAAdapterProtocol,
         store: StoreProtocol,
         max_age_seconds: int,
         auto_rollback_expired: bool,
-        lock_manager: Optional[LockManager] = None,
+        lock_manager: LockManager | None = None,
     ) -> int:
         """Recover in-doubt transactions.
 
@@ -65,7 +64,7 @@ class DefaultRecoveryStrategy:
 
             # Use per-transaction locking if lock manager provided
             lock_key = f"xa:finalize:{global_tx.gtrid}"
-            
+
             if lock_manager:
                 lock_handle = lock_manager.try_acquire(lock_key, timeout=60.0)
                 if not lock_handle:
@@ -73,7 +72,8 @@ class DefaultRecoveryStrategy:
                     continue
                 # Re-check state inside lock
                 current_tx = store.get_global(global_tx.gtrid)
-                if not current_tx or current_tx.state in (GlobalState.COMMITTED, GlobalState.ROLLED_BACK):
+                terminal = (GlobalState.COMMITTED, GlobalState.ROLLED_BACK)
+                if not current_tx or current_tx.state in terminal:
                     lock_handle.release()
                     continue
                 # Use lock handle as context manager for automatic release
@@ -84,9 +84,7 @@ class DefaultRecoveryStrategy:
             with lock_context:
                 try:
                     branches = store.get_branches(global_tx.gtrid)
-                    prepared_branches = [
-                        b for b in branches if b.state == BranchState.PREPARED
-                    ]
+                    prepared_branches = [b for b in branches if b.state == BranchState.PREPARED]
 
                     # Reconcile with XA RECOVER
                     if global_tx.gtrid in recovered_gtrids:
@@ -95,9 +93,7 @@ class DefaultRecoveryStrategy:
                         ]
 
                         for xid in recovered_xids_for_gtrid:
-                            branch = next(
-                                (b for b in branches if b.bqual == xid.bqual), None
-                            )
+                            branch = next((b for b in branches if b.bqual == xid.bqual), None)
                             if branch and branch.state != BranchState.PREPARED:
                                 store.update_branch(
                                     gtrid=global_tx.gtrid,
@@ -119,9 +115,7 @@ class DefaultRecoveryStrategy:
                     # Finalize based on decision
                     if global_tx.decision == Decision.COMMIT:
                         if prepared_branches:
-                            self._commit_global(
-                                global_tx.gtrid, prepared_branches, adapter, store
-                            )
+                            self._commit_global(global_tx.gtrid, prepared_branches, adapter, store)
                             recovered += 1
                     elif global_tx.decision == Decision.ROLLBACK:
                         if prepared_branches:
@@ -146,14 +140,12 @@ class DefaultRecoveryStrategy:
                                     )
                                     recovered += 1
                 except Exception as e:
-                    raise RecoveryError(
-                        f"Recovery failed for gtrid {global_tx.gtrid}: {e}"
-                    ) from e
+                    raise RecoveryError(f"Recovery failed for gtrid {global_tx.gtrid}: {e}") from e
 
     def _commit_global(
         self,
         gtrid: str,
-        branches: List[BranchTransaction],
+        branches: list[BranchTransaction],
         adapter: XAAdapterProtocol,
         store: StoreProtocol,
     ) -> None:
@@ -174,9 +166,7 @@ class DefaultRecoveryStrategy:
                     state=BranchState.COMMITTED,
                 )
             except Exception as e:
-                raise FinalizationError(
-                    f"Failed to commit branch {branch.bqual}: {e}"
-                ) from e
+                raise FinalizationError(f"Failed to commit branch {branch.bqual}: {e}") from e
 
         store.update_global(
             gtrid=gtrid,
@@ -187,7 +177,7 @@ class DefaultRecoveryStrategy:
     def _rollback_global(
         self,
         gtrid: str,
-        branches: List[BranchTransaction],
+        branches: list[BranchTransaction],
         adapter: XAAdapterProtocol,
         store: StoreProtocol,
     ) -> None:
@@ -208,9 +198,7 @@ class DefaultRecoveryStrategy:
                     state=BranchState.ROLLED_BACK,
                 )
             except Exception as e:
-                raise FinalizationError(
-                    f"Failed to rollback branch {branch.bqual}: {e}"
-                ) from e
+                raise FinalizationError(f"Failed to rollback branch {branch.bqual}: {e}") from e
 
         store.update_global(
             gtrid=gtrid,

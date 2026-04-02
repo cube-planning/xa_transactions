@@ -44,6 +44,8 @@ graph TD
 
 ## Installation
 
+Requires **Python 3.10+**.
+
 ```bash
 pip install xa-transactions
 ```
@@ -53,6 +55,51 @@ For Celery integration:
 ```bash
 pip install xa-transactions[celery]
 ```
+
+## Development
+
+Use a **virtual environment** and **pip** (do not install into the system interpreter).
+
+From the repository root:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate   # Linux / macOS
+# .venv\Scripts\activate    # Windows (cmd/PowerShell)
+python -m pip install -U pip
+python -m pip install -e ".[dev]"
+```
+
+That installs the package in editable mode plus dev tools (e.g. Ruff). Optional extras: `pip install -e ".[dev,celery]"` if you need Celery locally.
+
+Building **`mysqlclient`** may require MySQL/MariaDB client libraries and build tools on your OS; if install fails, use **`PyMySQL`** (already a dependency) or install the client headers first.
+
+Optional helpers (same end state as the commands above):
+
+```bash
+./scripts/check_dev_dependencies.sh   # informational: git, python, pip, optional pyenv, build hints
+./scripts/setup_local_env.sh        # create .venv and pip install -e ".[dev]"
+```
+
+### Testing
+
+**PR / default local run:** **Ruff** + **unit tests** (excludes optional integration tests):
+
+```bash
+ruff check xa_transactions tests && ruff format --check xa_transactions tests
+pytest --cov=xa_transactions --cov-report=term-missing
+```
+
+Do not reduce coverage without a good reason (review in PRs).
+
+**Optional integrations** (Celery / Django) are behind pytest markers. Install extras, then run only those tests:
+
+```bash
+pip install -e ".[dev,celery,django]"
+pytest -m "celery or django" -v
+```
+
+CI runs **Linux × Python 3.10–3.12**: unit job (ruff + default `pytest`), plus a separate job for marked integration tests with extras. Releases should go out only when CI is green on the tagged commit.
 
 ## Quick Start
 
