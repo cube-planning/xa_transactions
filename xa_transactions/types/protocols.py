@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Any, Protocol
 from contextlib import contextmanager
 from datetime import datetime
+from typing import Any, Protocol
+
 from xa_transactions.types.types import (
+    XID,
+    BranchState,
+    BranchTransaction,
     Decision,
     GlobalState,
-    BranchState,
     GlobalTransaction,
-    BranchTransaction,
-    XID,
 )
 
 

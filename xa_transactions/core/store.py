@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+
+from xa_transactions.types.exceptions import StoreError
+from xa_transactions.types.protocols import Connection
 from xa_transactions.types.types import (
+    BranchState,
+    BranchTransaction,
     Decision,
     GlobalState,
-    BranchState,
     GlobalTransaction,
-    BranchTransaction,
 )
-from xa_transactions.types.protocols import Connection, StoreProtocol
-from xa_transactions.types.exceptions import StoreError
 
 
 class MySQLStore:
@@ -92,11 +93,14 @@ class MySQLStore:
         now = datetime.now(timezone.utc)
         cursor = self.connection.cursor()
         try:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO xa_global
                 (gtrid, decision, state, expected_count, created_at, updated_at)
                 VALUES (%s, %s, %s, %s, %s, %s)
-            """, (gtrid, decision.value, state.value, expected_count, now, now))
+            """,
+                (gtrid, decision.value, state.value, expected_count, now, now),
+            )
             self.connection.commit()
             return GlobalTransaction(
                 gtrid=gtrid,
@@ -123,12 +127,15 @@ class MySQLStore:
         """
         cursor = self.connection.cursor()
         try:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT gtrid, decision, state, expected_count,
                        created_at, updated_at, finalized_at
                 FROM xa_global
                 WHERE gtrid = %s
-            """, (gtrid,))
+            """,
+                (gtrid,),
+            )
             row = cursor.fetchone()
             if not row:
                 return None
@@ -212,17 +219,23 @@ class MySQLStore:
         cursor = self.connection.cursor()
         try:
             if prepared_at is not None:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO xa_branch
                     (gtrid, bqual, state, created_at, updated_at, prepared_at)
                     VALUES (%s, %s, %s, %s, %s, %s)
-                """, (gtrid, bqual, state.value, now, now, prepared_at))
+                """,
+                    (gtrid, bqual, state.value, now, now, prepared_at),
+                )
             else:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO xa_branch
                     (gtrid, bqual, state, created_at, updated_at)
                     VALUES (%s, %s, %s, %s, %s)
-                """, (gtrid, bqual, state.value, now, now))
+                """,
+                    (gtrid, bqual, state.value, now, now),
+                )
             self.connection.commit()
             return BranchTransaction(
                 gtrid=gtrid,
@@ -250,11 +263,14 @@ class MySQLStore:
         """
         cursor = self.connection.cursor()
         try:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT gtrid, bqual, state, created_at, updated_at, prepared_at
                 FROM xa_branch
                 WHERE gtrid = %s AND bqual = %s
-            """, (gtrid, bqual))
+            """,
+                (gtrid, bqual),
+            )
             row = cursor.fetchone()
             if not row:
                 return None
@@ -320,12 +336,15 @@ class MySQLStore:
         """
         cursor = self.connection.cursor()
         try:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT gtrid, bqual, state, created_at, updated_at, prepared_at
                 FROM xa_branch
                 WHERE gtrid = %s
                 ORDER BY bqual
-            """, (gtrid,))
+            """,
+                (gtrid,),
+            )
             rows = cursor.fetchall()
             return [
                 BranchTransaction(
@@ -352,12 +371,15 @@ class MySQLStore:
         """
         cursor = self.connection.cursor()
         try:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT gtrid, bqual, state, created_at, updated_at, prepared_at
                 FROM xa_branch
                 WHERE gtrid = %s AND state = 'PREPARED'
                 ORDER BY bqual
-            """, (gtrid,))
+            """,
+                (gtrid,),
+            )
             rows = cursor.fetchall()
             return [
                 BranchTransaction(
@@ -388,14 +410,17 @@ class MySQLStore:
         cursor = self.connection.cursor()
         try:
             if max_age_seconds:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT gtrid, decision, state, expected_count,
                            created_at, updated_at, finalized_at
                     FROM xa_global
                     WHERE state NOT IN ('COMMITTED', 'ROLLED_BACK')
                     AND created_at < DATE_SUB(NOW(), INTERVAL %s SECOND)
                     ORDER BY created_at
-                """, (max_age_seconds,))
+                """,
+                    (max_age_seconds,),
+                )
             else:
                 cursor.execute("""
                     SELECT gtrid, decision, state, expected_count,

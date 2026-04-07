@@ -1,8 +1,8 @@
 """Infrastructure components for XA transactions."""
 
 from xa_transactions.infrastructure.connections import (
-    SimpleConnectionFactory,
     PooledConnectionFactory,
+    SimpleConnectionFactory,
 )
 from xa_transactions.infrastructure.recovery import DefaultRecoveryStrategy
 

@@ -7,7 +7,7 @@ name = "xa-transactions"
 version = "0.2.0"
 description = "MySQL XA (2-phase commit) transaction coordination library for parallel workers"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
     {name = "Your Name", email = "your.email@example.com"}
@@ -18,7 +18,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -33,6 +32,16 @@ dependencies = [
 celery = [
     "celery>=5.0.0",
 ]
+django = [
+    "django>=4.2",
+]
+dev = [
+    "ruff>=0.8.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
+    "pre-commit>=4.0.0",
+    "commitizen>=3.0.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/yourusername/xa-transactions"
@@ -46,8 +55,57 @@ xa_transactions = ["py.typed"]
 where = ["."]
 include = ["xa_transactions*"]
 
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["xa_transactions"]
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "UP",
+    "B",
+]
+per-file-ignores = { "xa_transactions/integrations/__init__.py" = ["F401"] }
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "celery: needs Celery installed (optional extra)",
+    "django: needs Django installed (optional extra)",
+]
+addopts = "-m \"not celery and not django\""
+
+[tool.coverage.run]
+branch = true
+source = ["xa_transactions"]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.2.0"
+tag_format = "v$version"
+version_files = [
+    "pyproject.toml:version",
+    "xa_transactions/__init__.py:__version__",
+]
+# Keep a Changelog–compatible output; see https://commitizen-tools.github.io/commitizen/commands/changelog/
+changelog_file = "CHANGELOG.md"
+update_changelog_on_bump = true
+changelog_incremental = true
+changelog_start_rev = "v0.1.0"

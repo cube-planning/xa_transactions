@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Generator
-from typing import Any
 from contextlib import contextmanager
-from xa_transactions.types.types import XID
-from xa_transactions.types.protocols import Connection, XAAdapterProtocol
+from typing import Any
+
 from xa_transactions.types.exceptions import XAAdapterError
+from xa_transactions.types.protocols import Connection
+from xa_transactions.types.types import XID
 
 
 class MySQLXAAdapter:
@@ -65,7 +66,7 @@ class MySQLXAAdapter:
         # Check for Django transaction
         try:
             from xa_transactions.integrations.django import is_django_transaction_active
-            
+
             if is_django_transaction_active():
                 if not auto_commit_django:
                     raise XAAdapterError(
@@ -76,6 +77,7 @@ class MySQLXAAdapter:
                 # Auto-commit Django transaction if requested
                 try:
                     from django.db import transaction
+
                     transaction.commit()
                 except Exception as e:
                     raise XAAdapterError(
@@ -83,7 +85,7 @@ class MySQLXAAdapter:
                     ) from e
         except ImportError:
             pass  # Django not available
-        
+
         try:
             sql = f"XA START {xid.to_sql()}"
             cursor = self._execute(sql)
@@ -186,7 +188,7 @@ class MySQLXAAdapter:
                     if len(row) < 4:
                         continue
                     format_id, gtrid_len, bqual_len, data = row[0], row[1], row[2], row[3]
-                    
+
                     if isinstance(data, bytes):
                         gtrid = data[:gtrid_len].decode("utf-8")
                         bqual = data[gtrid_len : gtrid_len + bqual_len].decode("utf-8")
@@ -195,7 +197,7 @@ class MySQLXAAdapter:
                         bqual = data[gtrid_len : gtrid_len + bqual_len]
                     else:
                         continue
-                        
+
                     xids.append(XID(gtrid=gtrid, bqual=bqual, format_id=format_id))
                 return xids
             finally:
@@ -218,7 +220,9 @@ class MySQLXAAdapter:
         return self._execute(sql, params)
 
     @contextmanager
-    def branch_transaction(self, gtrid: str, bqual: str, auto_commit_django: bool = False) -> Generator[MySQLXAAdapter, None, None]:
+    def branch_transaction(
+        self, gtrid: str, bqual: str, auto_commit_django: bool = False
+    ) -> Generator[MySQLXAAdapter, None, None]:
         """Context manager for a branch transaction.
 
         Automatically handles XA START, END, and PREPARE.
@@ -238,14 +242,15 @@ class MySQLXAAdapter:
                 adapter.execute("INSERT INTO ...")
         """
         xid = XID(gtrid=gtrid, bqual=bqual, format_id=self.format_id)
-        
+
         # Set XA state for Django integration
         try:
             from xa_transactions.integrations.django import set_xa_active
+
             set_xa_active(True)
         except ImportError:
             pass  # Django not available
-        
+
         try:
             self.xa_start(xid, auto_commit_django=auto_commit_django)
             yield self
@@ -265,6 +270,7 @@ class MySQLXAAdapter:
             # Clear XA state
             try:
                 from xa_transactions.integrations.django import set_xa_active
+
                 set_xa_active(False)
             except ImportError:
                 pass

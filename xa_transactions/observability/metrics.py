@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
-from xa_transactions.types.protocols import MetricsCollector
+
 from xa_transactions.types.types import Decision
 
 
@@ -61,6 +61,7 @@ class LoggingMetrics:
             logger: Optional logger instance. If None, uses default logger.
         """
         import logging
+
         self.logger = logger or logging.getLogger(__name__)
 
     def record_transaction_created(self, gtrid: str) -> None:

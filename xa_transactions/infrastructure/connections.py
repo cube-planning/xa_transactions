@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from typing import Any
-from xa_transactions.types.protocols import Connection, ConnectionFactory
+
+from xa_transactions.types.protocols import Connection
 
 
 class SimpleConnectionFactory:

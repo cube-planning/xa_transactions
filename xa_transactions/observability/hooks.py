@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
-from xa_transactions.types.protocols import TransactionHooks
+
 from xa_transactions.types.types import Decision
 
 
@@ -50,6 +50,7 @@ class LoggingHooks:
             logger: Optional logger instance. If None, uses default logger.
         """
         import logging
+
         self.logger = logger or logging.getLogger(__name__)
 
     def on_global_created(self, gtrid: str, expected_count: int) -> None:

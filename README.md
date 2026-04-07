@@ -44,6 +44,8 @@ graph TD
 
 ## Installation
 
+Requires **Python 3.10+**.
+
 ```bash
 pip install xa-transactions
 ```
@@ -53,6 +55,64 @@ For Celery integration:
 ```bash
 pip install xa-transactions[celery]
 ```
+
+## Development
+
+Release history: [CHANGELOG.md](CHANGELOG.md). Commits use [Conventional Commits](https://www.conventionalcommits.org/) via [Commitizen](https://commitizen-tools.github.io/commitizen/) (`pip install -e ".[dev]"` includes `cz`; use **`git cz`** to commit).
+
+**Changelog automation** ([`pyproject.toml`](pyproject.toml) `[tool.commitizen]`): **`cz bump`** updates **`CHANGELOG.md`** from the commit range since the last tag (`changelog_incremental`, `update_changelog_on_bump`). To regenerate without bumping: **`cz changelog --incremental`** (preview with **`cz changelog --dry-run --incremental`**). Generated sections use Conventional Commit types (**feat** / **fix** / …), not always Keep a Changelog’s **Added** / **Changed** — edit for wording or categories after generation if you care.
+
+**Tags on `main`:** after each merge to `main`, [`.github/workflows/tag-on-main.yml`](.github/workflows/tag-on-main.yml) creates the git tag `v<version>` from `[project].version` in [`pyproject.toml`](pyproject.toml) if that tag does not already exist on the remote (bump the version in `pyproject.toml` when you release).
+
+Use a **virtual environment** and **pip** (do not install into the system interpreter).
+
+From the repository root:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate   # Linux / macOS
+# .venv\Scripts\activate    # Windows (cmd/PowerShell)
+python -m pip install -U pip
+python -m pip install -e ".[dev]"
+pre-commit install
+```
+
+**Required for development:** the **`dev`** extra installs the editable package plus **Ruff**, **pytest**, **pytest-cov**, and the **`pre-commit`** CLI. You must run **`pre-commit install`** once per clone (after the venv has those packages) so Git runs the hooks; [`scripts/setup_local_env.sh`](scripts/setup_local_env.sh) does this automatically when extras include `dev`.
+
+Hooks (see [`.pre-commit-config.yaml`](.pre-commit-config.yaml)): **Ruff** on `xa_transactions/` and `tests/` (same scope as CI) and **unit tests only** via [`scripts/pre_commit_pytest_unit.sh`](scripts/pre_commit_pytest_unit.sh) (prefers `.venv/bin/python`; same `-m "not celery and not django"` as default `pytest`). Integration tests with `@pytest.mark.celery` / `django` are not run in the hook. Run the same checks manually with `pre-commit run --all-files`.
+
+Optional extras: `pip install -e ".[dev,celery]"` if you need Celery locally (still use `dev` for hooks and tooling).
+
+Building **`mysqlclient`** may require MySQL/MariaDB client libraries and build tools on your OS; if install fails, use **`PyMySQL`** (already a dependency) or install the client headers first.
+
+Optional helpers (same end state as the commands above):
+
+```bash
+./scripts/check_dev_dependencies.sh           # macOS only: summarize missing deps, then [y/n/a] per install (a = yes to rest); full report after
+./scripts/check_dev_dependencies.sh --dry-run # only missing deps, one line each (missing:… / optional:…)
+./scripts/check_dev_dependencies.sh -y        # non-interactive: brew + pyenv (does not change default python3 / pyenv global)
+./scripts/setup_local_env.sh        # create .venv, pip install -e ".[dev]", pre-commit install
+```
+
+### Testing
+
+**PR / default local run:** **Ruff** + **unit tests** (excludes optional integration tests):
+
+```bash
+ruff check xa_transactions tests && ruff format --check xa_transactions tests
+pytest --cov=xa_transactions --cov-report=term-missing
+```
+
+Do not reduce coverage without a good reason (review in PRs).
+
+**Optional integrations** (Celery / Django) are behind pytest markers. Install extras, then run only those tests:
+
+```bash
+pip install -e ".[dev,celery,django]"
+pytest -m "celery or django" -v
+```
+
+CI runs **Linux × Python 3.10–3.12**: unit job (ruff + default `pytest`), plus a separate job for marked integration tests with extras. Releases should go out only when CI is green on the tagged commit.
 
 ## Quick Start
 

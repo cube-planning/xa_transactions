@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
 from collections.abc import Callable
 from functools import wraps
+from typing import Any
 
 try:
     from celery import Task, current_task
+
     CELERY_AVAILABLE = True
 except ImportError:
     CELERY_AVAILABLE = False
@@ -15,8 +16,8 @@ except ImportError:
     current_task = None
 
 from xa_transactions.core.adapter import XAAdapter
-from xa_transactions.types.protocols import XAAdapterProtocol
 from xa_transactions.core.coordinator import Coordinator
+from xa_transactions.types.protocols import XAAdapterProtocol
 from xa_transactions.types.types import XID
 
 
@@ -92,6 +93,7 @@ class XATask(Task):
         # Set XA state for Django integration
         try:
             from xa_transactions.integrations.django import set_xa_active
+
             set_xa_active(True)
         except ImportError:
             pass  # Django not available
@@ -116,6 +118,7 @@ class XATask(Task):
             # Clear XA state
             try:
                 from xa_transactions.integrations.django import set_xa_active
+
                 set_xa_active(False)
             except ImportError:
                 pass
@@ -162,6 +165,7 @@ def xa_task(
             # Set XA state for Django integration
             try:
                 from xa_transactions.integrations.django import set_xa_active
+
                 set_xa_active(True)
             except ImportError:
                 pass  # Django not available
@@ -186,6 +190,7 @@ def xa_task(
                 # Clear XA state
                 try:
                     from xa_transactions.integrations.django import set_xa_active
+
                     set_xa_active(False)
                 except ImportError:
                     pass

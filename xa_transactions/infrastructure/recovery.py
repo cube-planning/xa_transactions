@@ -4,21 +4,21 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from datetime import datetime, timezone
+
+from xa_transactions.types.exceptions import FinalizationError, RecoveryError
 from xa_transactions.types.protocols import (
-    RecoveryStrategy,
-    XAAdapterProtocol,
-    StoreProtocol,
     LockManager,
+    StoreProtocol,
+    XAAdapterProtocol,
 )
 from xa_transactions.types.types import (
+    XID,
+    BranchState,
+    BranchTransaction,
     Decision,
     GlobalState,
-    BranchState,
-    XID,
     GlobalTransaction,
-    BranchTransaction,
 )
-from xa_transactions.types.exceptions import RecoveryError, FinalizationError
 
 
 class DefaultRecoveryStrategy:
@@ -68,7 +68,7 @@ class DefaultRecoveryStrategy:
 
             # Use per-transaction locking if lock manager provided
             lock_key = f"xa:finalize:{global_tx.gtrid}"
-            
+
             if lock_manager:
                 lock_handle = lock_manager.try_acquire(lock_key, timeout=60.0)
                 if not lock_handle:
@@ -76,7 +76,8 @@ class DefaultRecoveryStrategy:
                     continue
                 # Re-check state inside lock
                 current_tx = store.get_global(global_tx.gtrid)
-                if not current_tx or current_tx.state in (GlobalState.COMMITTED, GlobalState.ROLLED_BACK):
+                terminal = (GlobalState.COMMITTED, GlobalState.ROLLED_BACK)
+                if not current_tx or current_tx.state in terminal:
                     lock_handle.release()
                     continue
                 # Use lock handle as context manager for automatic release
@@ -87,9 +88,7 @@ class DefaultRecoveryStrategy:
             with lock_context:
                 try:
                     branches = store.get_branches(global_tx.gtrid)
-                    prepared_branches = [
-                        b for b in branches if b.state == BranchState.PREPARED
-                    ]
+                    prepared_branches = [b for b in branches if b.state == BranchState.PREPARED]
 
                     # Reconcile with XA RECOVER
                     if global_tx.gtrid in recovered_gtrids:
@@ -98,9 +97,7 @@ class DefaultRecoveryStrategy:
                         ]
 
                         for xid in recovered_xids_for_gtrid:
-                            branch = next(
-                                (b for b in branches if b.bqual == xid.bqual), None
-                            )
+                            branch = next((b for b in branches if b.bqual == xid.bqual), None)
                             if branch and branch.state != BranchState.PREPARED:
                                 store.update_branch(
                                     gtrid=global_tx.gtrid,
@@ -150,9 +147,9 @@ class DefaultRecoveryStrategy:
                                     )
                                     recovered += 1
                 except Exception as e:
-                    raise RecoveryError(
-                        f"Recovery failed for gtrid {global_tx.gtrid}: {e}"
-                    ) from e
+                    raise RecoveryError(f"Recovery failed for gtrid {global_tx.gtrid}: {e}") from e
+
+        return recovered
 
     def _commit_global(
         self,
@@ -179,9 +176,7 @@ class DefaultRecoveryStrategy:
                     state=BranchState.COMMITTED,
                 )
             except Exception as e:
-                raise FinalizationError(
-                    f"Failed to commit branch {branch.bqual}: {e}"
-                ) from e
+                raise FinalizationError(f"Failed to commit branch {branch.bqual}: {e}") from e
 
         store.update_global(
             gtrid=gtrid,
@@ -214,9 +209,7 @@ class DefaultRecoveryStrategy:
                     state=BranchState.ROLLED_BACK,
                 )
             except Exception as e:
-                raise FinalizationError(
-                    f"Failed to rollback branch {branch.bqual}: {e}"
-                ) from e
+                raise FinalizationError(f"Failed to rollback branch {branch.bqual}: {e}") from e
 
         store.update_global(
             gtrid=gtrid,
